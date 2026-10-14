@@ -1,0 +1,17 @@
+# При каждом обновлении на GitHub проверяем формулы бюджета.
+# Результат виден во вкладке Actions репозитория (зелёная галочка / красный крестик).
+name: Тесты бюджета
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node tests/budget.test.js

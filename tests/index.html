@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Тесты бюджета</title>
+    <style>
+      body { font: 14px/1.5 ui-monospace, Menlo, monospace; padding: 16px; background: #fff; color: #111; }
+      pre { white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <h1>Тесты расчёта бюджета</h1>
+    <pre id="out"></pre>
+    <script type="module">
+      const out = document.getElementById('out');
+      globalThis.print = (s) => (out.textContent += s + '\n');
+      globalThis.__testResult = (passed, failed) => (document.title = failed ? `✗ ${failed}` : `✓ ${passed}`);
+      await import('./budget.test.js');
+    </script>
+  </body>
+</html>

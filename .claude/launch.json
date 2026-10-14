@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "budget",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["tools/serve.py", "5173"],
+      "port": 5173
+    },
+    {
+      "name": "budget-pages",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["tools/serve.py", "5174", "--pages"],
+      "port": 5174
+    }
+  ]
+}

@@ -1,0 +1,49 @@
+rules_version = '2';
+
+// Правила доступа: бюджет семьи видят и меняют только её участники.
+// Вставить в Firebase Console → Firestore Database → Rules → Publish.
+service cloud.firestore {
+  match /databases/{db}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isMember(fid) {
+      return signedIn() && request.auth.uid in get(/databases/$(db)/documents/families/$(fid)).data.members;
+    }
+    // Для записей: семья и конверты создаются одним пакетом, поэтому смотрим состояние «после» записи
+    function isMemberAfter(fid) {
+      return signedIn() && request.auth.uid in getAfter(/databases/$(db)/documents/families/$(fid)).data.members;
+    }
+
+    // Профиль: к какой семье относится пользователь
+    match /users/{uid} {
+      allow read, write: if signedIn() && request.auth.uid == uid;
+    }
+
+    // Код приглашения → id семьи. Читать можно только по точному коду (без перебора списка).
+    match /invites/{code} {
+      allow get: if signedIn();
+      allow create: if signedIn()
+        && request.auth.uid in getAfter(/databases/$(db)/documents/families/$(request.resource.data.familyId)).data.members;
+      allow delete: if isMember(resource.data.familyId);
+    }
+
+    match /families/{fid} {
+      allow read: if signedIn() && request.auth.uid in resource.data.members;
+      allow create: if signedIn() && request.resource.data.members == [request.auth.uid];
+      // Участник меняет что угодно; новый человек (знающий код → id семьи) может только добавить себя
+      allow update: if signedIn() && (
+        request.auth.uid in resource.data.members
+        || (
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'memberNames'])
+          && request.resource.data.members == resource.data.members.concat([request.auth.uid])
+        )
+      );
+
+      match /{sub=**} {
+        allow read: if isMember(fid);
+        allow write: if isMemberAfter(fid);
+      }
+    }
+  }
+}
