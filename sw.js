@@ -1,6 +1,6 @@
 // Service worker: приложение открывается без интернета.
 // При изменении файлов приложения увеличьте VERSION, чтобы телефоны получили обновление.
-const VERSION = 'v1.0.1';
+const VERSION = 'v1.0.2';
 const SHELL = `shell-${VERSION}`;
 const CDN = 'cdn-v1';
 
@@ -9,7 +9,7 @@ const SHELL_FILES = [
   'index.html',
   'manifest.webmanifest',
   'css/app.css',
-  'icons/icon.svg',
+  'icons/favicon-64.png',
   'icons/icon-192.png',
   'icons/apple-touch-icon.png',
   'js/app.js',
