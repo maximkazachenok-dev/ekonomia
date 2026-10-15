@@ -13,9 +13,14 @@
     <meta name="apple-mobile-web-app-title" content="Экономия" />
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" href="icons/favicon-64.png" type="image/png" sizes="64x64" />
-    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
+    <link rel="icon" href="icons/icon-192.png" type="image/png" sizes="192x192" />
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" sizes="180x180" />
     <link rel="stylesheet" href="css/app.css" />
     <link rel="modulepreload" href="https://unpkg.com/htm@3.1.1/preact/standalone.module.js" crossorigin />
+    <!-- Firebase подгружается после проверки настроек; заранее начинаем скачивать, чтобы не ждать по очереди -->
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js" crossorigin />
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js" crossorigin />
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js" crossorigin />
   </head>
   <body>
     <div id="root"><div class="splash"><div class="onb__logo">💰</div></div></div>

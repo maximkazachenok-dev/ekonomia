@@ -1,6 +1,7 @@
-// Service worker: приложение открывается без интернета.
-// При изменении файлов приложения увеличьте VERSION, чтобы телефоны получили обновление.
-const VERSION = 'v1.3.0';
+// Service worker: приложение открывается сразу из памяти телефона, в том числе без интернета.
+// При ЛЮБОМ изменении файлов приложения увеличьте VERSION: браузер увидит новый sw.js,
+// в фоне скачает свежие файлы, и со следующего открытия заработает новая версия.
+const VERSION = 'v1.3.1';
 const SHELL = `shell-${VERSION}`;
 const CDN = 'cdn-v1';
 
@@ -39,11 +40,19 @@ const SHELL_FILES = [
   'js/screens/login.js',
 ];
 
+const SHELL_PATHS = new Set(SHELL_FILES.map((f) => new URL(f, self.location).pathname));
+
 // Библиотеки с CDN (версии зафиксированы, поэтому их можно кэшировать навсегда)
 const CDN_HOSTS = ['unpkg.com', 'www.gstatic.com'];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(SHELL).then((c) => c.addAll(SHELL_FILES)).then(() => self.skipWaiting()));
+  // cache: 'reload' — берём файлы с сервера, а не из HTTP-кэша браузера (GitHub Pages держит его 10 минут)
+  e.waitUntil(
+    caches
+      .open(SHELL)
+      .then((c) => c.addAll(SHELL_FILES.map((f) => new Request(f, { cache: 'reload' }))))
+      .then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener('activate', (e) => {
@@ -76,29 +85,26 @@ self.addEventListener('fetch', (e) => {
 
   if (url.origin !== location.origin) return; // Firestore, Auth и пр. — напрямую
 
-  // Свои файлы: сеть (не дольше 3 секунд), иначе кэш. Обновления приходят сразу,
-  // а в магазине со слабой связью приложение не зависает на загрузке.
-  e.respondWith(networkFirst(req));
+  // Свои файлы: сначала память телефона — запуск мгновенный и не зависит от связи.
+  // Свежие версии приходят вместе с новым sw.js (см. VERSION).
+  e.respondWith(cacheFirst(req));
 });
 
-async function networkFirst(req) {
-  const fromCache = () =>
-    caches.match(req, { ignoreSearch: true }).then((hit) => hit || (req.mode === 'navigate' ? caches.match('index.html') : undefined));
-  // no-cache: сверяемся с сервером (GitHub Pages иначе отдаёт файлы из HTTP-кэша до 10 минут).
-  // Для навигации нельзя пересоздать Request с параметрами, поэтому берём URL.
-  const network = fetch(req.mode === 'navigate' ? req.url : req, { cache: 'no-cache' }).then((res) => {
-    if (res.ok) {
+async function cacheFirst(req) {
+  const hit = await caches.match(req, { ignoreSearch: true });
+  if (hit) return hit;
+  if (req.mode === 'navigate') {
+    const shell = await caches.match('index.html');
+    if (shell) return shell;
+  }
+  try {
+    const res = await fetch(req);
+    if (res.ok && SHELL_PATHS.has(new URL(req.url).pathname)) {
       const copy = res.clone();
       caches.open(SHELL).then((c) => c.put(req, copy));
     }
     return res;
-  });
-  const timeout = new Promise((resolve) => setTimeout(resolve, 3000));
-  try {
-    const res = await Promise.race([network, timeout.then(fromCache)]);
-    if (res) return res;
   } catch {
-    /* нет сети */
+    return Response.error();
   }
-  return (await fromCache()) || network.catch(() => Response.error());
 }

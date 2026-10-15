@@ -66,8 +66,14 @@ export function createFirebaseBackend(config) {
     localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
   });
 
+  // Firebase сообщает «вход проверен» один раз. Запоминаем, что сообщение уже было, и новым подписчикам
+  // отдаём состояние сразу — иначе подписавшийся чуть позже навсегда остаётся на заставке.
   const authListeners = new Set();
-  const emitAuth = () => authListeners.forEach((cb) => cb(toUser(auth.currentUser)));
+  let authKnown = false;
+  const emitAuth = () => {
+    authKnown = true;
+    authListeners.forEach((cb) => cb(toUser(auth.currentUser)));
+  };
   onAuthStateChanged(auth, emitAuth);
 
   const fam = (fid, ...path) => doc(db, 'families', fid, ...path);
@@ -93,6 +99,7 @@ export function createFirebaseBackend(config) {
 
     onAuth(cb) {
       authListeners.add(cb);
+      if (authKnown) cb(toUser(auth.currentUser));
       return () => authListeners.delete(cb);
     },
 
