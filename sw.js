@@ -1,6 +1,6 @@
 // Service worker: приложение открывается без интернета.
 // При изменении файлов приложения увеличьте VERSION, чтобы телефоны получили обновление.
-const VERSION = 'v1.2.0';
+const VERSION = 'v1.3.0';
 const SHELL = `shell-${VERSION}`;
 const CDN = 'cdn-v1';
 
@@ -18,6 +18,7 @@ const SHELL_FILES = [
   'js/lib/dates.js',
   'js/lib/money.js',
   'js/lib/budget.js',
+  'js/lib/voice-parse.js',
   'js/data/store.js',
   'js/data/local.js',
   'js/data/firebase.js',
@@ -28,6 +29,7 @@ const SHELL_FILES = [
   'js/ui/income-sheet.js',
   'js/ui/purchase-sheet.js',
   'js/ui/shop-sheet.js',
+  'js/ui/voice-card.js',
   'js/screens/shops.js',
   'js/screens/home.js',
   'js/screens/history.js',

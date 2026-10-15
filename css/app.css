@@ -192,6 +192,7 @@ svg { flex-shrink: 0; }
 .banner__chev { margin-left: auto; color: var(--muted); }
 .notice { display: flex; gap: 12px; padding: 12px; border-radius: var(--radius-sm); background: var(--surface-2); font-size: 14px; }
 .notice p { margin-top: 4px; color: var(--muted); }
+.notice .btn { margin-top: 10px; }
 .notice__icon { color: var(--muted); }
 .empty { text-align: center; color: var(--muted); padding: 40px 16px; }
 .footnote { text-align: center; color: var(--muted); font-size: 12px; padding: 8px; }
@@ -420,6 +421,25 @@ label.btn { cursor: pointer; }
 .purchase__top { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; }
 .purchase__items { font-size: 14px; color: var(--muted); display: flex; flex-direction: column; gap: 2px; }
 .purchase__item { display: flex; justify-content: space-between; gap: 8px; }
+
+/* ── Голосовой ввод ─────────────────────────────────── */
+.voice { gap: 8px; }
+.voice__row { display: flex; gap: 8px; align-items: center; }
+.voice__input { flex: 1; min-width: 0; }
+.voice__mic {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--primary-soft);
+  color: var(--primary);
+  flex-shrink: 0;
+}
+.voice__mic--on { background: var(--over); color: #fff; animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { transform: scale(1.08); } }
+.voice__go { width: 48px; padding: 0; flex-shrink: 0; }
+.voice__heard { font-size: 14px; color: var(--muted); font-style: italic; }
 
 /* ── Копилки ────────────────────────────────────────── */
 .goal { display: flex; align-items: center; gap: 12px; }

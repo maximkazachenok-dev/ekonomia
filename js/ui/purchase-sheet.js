@@ -20,6 +20,7 @@ export function PurchaseSheet({ opts, onClose }) {
   const [rows, setRows] = useState([emptyRow()]);
   const [onlyTotal, setOnlyTotal] = useState(false);
   const [total, setTotal] = useState('');
+  const [guessDone, setGuessDone] = useState(false);
 
   const suggestions = useMemo(() => itemSuggestions(txs), [txs]);
   const names = useMemo(() => [...suggestions.values()].map((s) => s.name), [suggestions]);
@@ -31,8 +32,11 @@ export function PurchaseSheet({ opts, onClose }) {
     setDate(src.date || today);
     const items = src.items || [];
     setRows(items.length ? items.map((it) => ({ name: it.name, price: toInputString(it.amount) })) : [emptyRow()]);
-    setOnlyTotal(Boolean(editing && !items.length));
-    setTotal(editing && !items.length ? toInputString(editing.amount) : '');
+    // Правка покупки без списка или фраза «гиппо 15» — только общая сумма
+    const totalOnly = editing ? !items.length : Boolean(opts.draft?.total);
+    setOnlyTotal(totalOnly);
+    setTotal(editing && !items.length ? toInputString(editing.amount) : opts.draft?.total ? toInputString(opts.draft.total) : '');
+    setGuessDone(false);
   }, [opts]);
 
   if (!opts) return null;
@@ -73,6 +77,20 @@ export function PurchaseSheet({ opts, onClose }) {
 
   return html`<${BottomSheet} open=${true} onClose=${onClose} title=${editing ? 'Покупка' : opts.draft ? 'Проверьте покупку' : 'Новая покупка'}>
     <form class="form" onSubmit=${submit}>
+      ${opts.draft?.phrase && html`<p class="voice__heard">Вы сказали: «${opts.draft.phrase}»</p>`}
+      ${opts.draft?.shopGuess &&
+      !guessDone &&
+      html`<div class="notice">
+        <div>
+          <strong>Магазина «${opts.draft.shopGuess}» нет в списке</strong>
+          <p>Создать раздел с таким названием? Название можно поправить потом.</p>
+          <button type="button" class="btn btn--primary" onClick=${async () => {
+            const id = await app.saveShop({ name: opts.draft.shopGuess, icon: '🏪', order: Date.now(), archived: false });
+            if (id) setShopId(id);
+            setGuessDone(true);
+          }}>Создать «${opts.draft.shopGuess}»</button>
+        </div>
+      </div>`}
       <div class="chips chips--scroll" role="radiogroup" aria-label="Раздел">
         ${visibleShops.map(
           (s) => html`<button type="button" role="radio" aria-checked=${s.id === shopId} class=${`chip ${s.id === shopId ? 'chip--active' : ''}`} onClick=${() => setShopId(s.id)}>

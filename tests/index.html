@@ -17,6 +17,7 @@
       globalThis.print = (s) => (out.textContent += s + '\n');
       globalThis.__testResult = (passed, failed) => (document.title = failed ? `✗ ${failed}` : `✓ ${passed}`);
       await import('./budget.test.js');
+      await import('./voice.test.js');
     </script>
   </body>
 </html>

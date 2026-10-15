@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node tests/budget.test.js"
+    "test": "node tests/budget.test.js && node tests/voice.test.js"
   }
 }

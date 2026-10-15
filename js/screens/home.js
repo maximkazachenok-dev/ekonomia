@@ -4,6 +4,7 @@ import { dailyAllowance, envelopeProgress, savingsProgress, envelopeLimit } from
 import { formatDay, pluralDays } from '../lib/dates.js';
 import { formatMoney } from '../lib/money.js';
 import { TxRow } from './history.js';
+import { VoiceCard } from '../ui/voice-card.js';
 
 function DailyCard({ env, hero }) {
   const { txs, today, period, family, openTx, plan } = useApp();
@@ -163,6 +164,7 @@ export function HomeScreen() {
     </button>`}
 
     ${daily.map((e, i) => html`<${DailyCard} key=${e.id} env=${e} hero=${i === 0} />`)}
+    ${daily.length > 0 && html`<${VoiceCard} />`}
     <${PlanLine} />
     <${PeriodEnvelopes} envelopes=${periodEnvs} />
     <${SavingsCard} envelopes=${savings} />
