@@ -1,6 +1,7 @@
 import { html, useState } from '../lib/preact.js';
 import { useApp, Icon, KIND_LABELS, showToast, Money } from '../ui/common.js';
 import { CURRENCIES, formatAmount } from '../lib/money.js';
+import { envelopeLimit } from '../lib/budget.js';
 
 function downloadFile(name, content, type) {
   const blob = new Blob([content], { type });
@@ -29,7 +30,7 @@ async function exportCsv({ backend, fid, envById, family, today }) {
 
 export function SettingsScreen() {
   const app = useApp();
-  const { backend, family, fid, envelopes, user, openEnvelope, updateFamily } = app;
+  const { backend, family, fid, envelopes, user, openEnvelope, updateFamily, plan, openIncome } = app;
   const [showArchived, setShowArchived] = useState(false);
   const isCloud = backend.mode === 'cloud';
   const members = Object.entries(family.memberNames || {});
@@ -84,6 +85,12 @@ export function SettingsScreen() {
 
     <section class="card">
       <h2 class="card__title">Бюджет</h2>
+      <div class="field field--row">
+        <span class="field__label">
+          Доход на период${plan ? html`: <${Money} kop=${plan.income} />, свободно <${Money} kop=${plan.free} />` : ': не введён'}
+        </span>
+        <button class="btn btn--ghost" onClick=${openIncome}>${plan ? 'Изменить' : 'Ввести'}</button>
+      </div>
       <label class="field field--row">
         <span class="field__label">День зарплаты</span>
         <select class="input input--select" value=${family.payday} onChange=${(e) => updateFamily({ payday: Number(e.target.value) })}>
@@ -112,7 +119,11 @@ export function SettingsScreen() {
                 <span class="env-row__name">${e.name}${e.archived ? ' (скрыт)' : ''}</span>
                 <span class="env-row__sub muted">
                   ${KIND_LABELS[e.kind]} ·
-                  ${e.kind === 'savings' ? html` цель <${Money} kop=${e.goal || 0} />` : html` <${Money} kop=${e.limit || 0} />`}
+                  ${e.kind === 'savings'
+                    ? html` в месяц <${Money} kop=${e.monthly || 0} />${e.goal ? html`, цель <${Money} kop=${e.goal} />` : ''}`
+                    : plan && e.id === plan.mainEnvelopeId
+                      ? ' из дохода'
+                      : html` <${Money} kop=${envelopeLimit(e, plan)} />`}
                 </span>
               </span>
               <span class="env-row__chev">${Icon.chevron}</span>

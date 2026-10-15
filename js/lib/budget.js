@@ -109,13 +109,71 @@ export function savingsProgress({ balance = 0, goal = 0 }) {
   return { balance, goal, percent, left: Math.max(0, goal - balance) };
 }
 
-// Итоги закрытого периода по всем расходным конвертам.
-export function periodSummary({ envelopes, txs, period }) {
+// ── Доход и обязательные статьи ──
+// План периода: { income, mandatory: {envelopeId: сумма}, free, mainEnvelopeId }.
+// free = доход − обязательные статьи; это сумма на период для главного конверта с дневным лимитом.
+
+// Главный конверт с дневным лимитом: из него тратятся свободные деньги.
+export function mainDailyEnvelope(envelopes) {
+  return envelopes.find((e) => e.kind === 'daily' && !e.archived) || null;
+}
+
+// Обязательные статьи: конверты «до зарплаты», прочие дневные конверты и копилки (сколько откладываем в месяц).
+export function mandatoryEnvelopes(envelopes) {
+  const main = mainDailyEnvelope(envelopes);
+  return envelopes.filter((e) => !e.archived && e !== main && ['period', 'daily', 'savings'].includes(e.kind));
+}
+
+export function mandatoryAmount(env) {
+  return env.kind === 'savings' ? env.monthly || 0 : env.limit || 0;
+}
+
+export function planPeriod({ income, mandatory, days }) {
+  const mandatoryTotal = Object.values(mandatory).reduce((s, v) => s + v, 0);
+  const free = income - mandatoryTotal;
+  return { mandatoryTotal, free, perDay: days > 0 ? Math.floor(Math.max(0, free) / days) : 0 };
+}
+
+// Новый план по доходу и текущим суммам конвертов (amounts переопределяет суммы, если заданы).
+export function buildPlan({ income, envelopes, amounts = {} }) {
+  const mandatory = {};
+  for (const e of mandatoryEnvelopes(envelopes)) mandatory[e.id] = amounts[e.id] ?? mandatoryAmount(e);
+  const { free } = planPeriod({ income, mandatory, days: 1 });
+  return { income, mandatory, free, mainEnvelopeId: mainDailyEnvelope(envelopes)?.id || null };
+}
+
+// План, который создаётся вместе с семейным бюджетом на первом запуске.
+export function initialPlan(user, income, envelopes) {
+  return { ...buildPlan({ income, envelopes }), createdBy: { uid: user.uid, name: user.name }, createdAt: Date.now() };
+}
+
+// Конверт изменили, добавили или скрыли посреди периода: поправить его сумму в плане и пересчитать свободное.
+export function applyEnvelopeToPlan(plan, env) {
+  if (!plan || env.id === plan.mainEnvelopeId) return plan;
+  const mandatory = { ...plan.mandatory };
+  if (env.archived || !['period', 'daily', 'savings'].includes(env.kind)) delete mandatory[env.id];
+  else mandatory[env.id] = mandatoryAmount(env);
+  const { free } = planPeriod({ income: plan.income, mandatory, days: 1 });
+  return { ...plan, mandatory, free };
+}
+
+// Сумма на период для конверта: из плана периода, а если дохода ещё нет — из настроек конверта.
+export function envelopeLimit(env, plan) {
+  if (plan) {
+    if (env.id === plan.mainEnvelopeId) return plan.free;
+    if (env.id in plan.mandatory) return plan.mandatory[env.id];
+  }
+  return env.limit || 0;
+}
+
+// Итоги закрытого периода по всем расходным конвертам (суммы берутся из плана того периода, если он есть).
+export function periodSummary({ envelopes, txs, period, plan = null }) {
   const rows = envelopes
     .filter((e) => e.kind !== 'savings' && !e.archived)
     .map((e) => {
+      const limit = envelopeLimit(e, plan);
       const spent = sumExpenses(txs, e.id, period.start, period.end);
-      return { envelope: e, limit: e.limit, spent, saved: e.limit - spent };
+      return { envelope: e, limit, spent, saved: limit - spent };
     });
   const totalLimit = rows.reduce((s, r) => s + r.limit, 0);
   const totalSpent = rows.reduce((s, r) => s + r.spent, 0);

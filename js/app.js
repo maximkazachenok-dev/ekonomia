@@ -3,6 +3,7 @@ import { AppContext, Toasts, showToast, Icon } from './ui/common.js';
 import { TxSheet } from './ui/tx-sheet.js';
 import { EnvelopeSheet } from './ui/envelope-sheet.js';
 import { SummarySheet } from './ui/summary-sheet.js';
+import { IncomeSheet } from './ui/income-sheet.js';
 import { HomeScreen } from './screens/home.js';
 import { HistoryScreen } from './screens/history.js';
 import { SavingsScreen } from './screens/savings.js';
@@ -10,7 +11,7 @@ import { SettingsScreen } from './screens/settings.js';
 import { Onboarding } from './screens/onboarding.js';
 import { LoginScreen } from './screens/login.js';
 import { createBackend, balanceChangesFor } from './data/store.js';
-import { getPeriod, previousPeriod, periodSummary } from './lib/budget.js';
+import { getPeriod, previousPeriod, periodSummary, applyEnvelopeToPlan } from './lib/budget.js';
 import { todayISO } from './lib/dates.js';
 import { formatMoney } from './lib/money.js';
 
@@ -49,7 +50,9 @@ function Budget({ backend, user, fid }) {
   const [txOpts, setTxOpts] = useState(null);
   const [envEdit, setEnvEdit] = useState(null);
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const [incomeOpen, setIncomeOpen] = useState(false);
   const [extraPeriods, setExtraPeriods] = useState(0);
+  const [periods, setPeriods] = useState(null);
 
   const payday = family?.payday || 10;
   const period = useMemo(() => getPeriod(today, payday), [today, payday]);
@@ -64,6 +67,7 @@ function Budget({ backend, user, fid }) {
   useEffect(() => backend.watchFamily(fid, setFamily), [fid]);
   useEffect(() => backend.watchEnvelopes(fid, setEnvelopes), [fid]);
   useEffect(() => backend.watchTransactions(fid, since, setTxs), [fid, since]);
+  useEffect(() => backend.watchPeriods(fid, setPeriods), [fid]);
 
   const envById = useMemo(() => Object.fromEntries((envelopes || []).map((e) => [e.id, e])), [envelopes]);
 
@@ -106,11 +110,31 @@ function Budget({ backend, user, fid }) {
     [fid, envById, addTx],
   );
 
-  if (!family || !envelopes || !txs) return html`<${Splash} />`;
+  if (!family || !envelopes || !txs || !periods) return html`<${Splash} />`;
+
+  // План текущего и прошлого периода (доход и обязательные статьи). Пока дохода нет — null.
+  const plan = periods[period.start] || null;
+  const prevPlan = periods[prevPeriod.start] || null;
 
   // Итоги прошлого периода показываем, если в нём были траты и итоги ещё не закрыты.
-  const prevSummary = periodSummary({ envelopes, txs, period: prevPeriod });
+  const prevSummary = periodSummary({ envelopes, txs, period: prevPeriod, plan: prevPlan });
   const summaryPending = !family.summaryDone?.[prevPeriod.start] && prevSummary.totalSpent > 0;
+
+  const savePlan = (newPlan, envelopeUpdates) =>
+    backend
+      .savePeriod(fid, period.start, { ...newPlan, updatedBy: { uid: user.uid, name: user.name }, updatedAt: Date.now() }, envelopeUpdates)
+      .catch((e) => showToast(e.message));
+
+  // Сумму статьи поменяли (или статью добавили/скрыли) посреди периода — пересчитать свободные деньги.
+  const saveEnvelope = async (env) => {
+    const id = await backend.saveEnvelope(fid, env).catch((e) => showToast(e.message));
+    if (plan && id) {
+      const full = { ...envById[id], ...env, id };
+      const next = applyEnvelopeToPlan(plan, full);
+      if (next !== plan && JSON.stringify(next) !== JSON.stringify(plan)) savePlan(next);
+    }
+    return id;
+  };
 
   const ctx = {
     backend,
@@ -130,10 +154,14 @@ function Budget({ backend, user, fid }) {
     openEnvelope: setEnvEdit,
     openSummary: () => setSummaryOpen(true),
     summaryPending,
+    plan,
+    prevPlan,
+    openIncome: () => setIncomeOpen(true),
+    savePlan,
     addTx,
     updateTx,
     deleteTx,
-    saveEnvelope: (env) => backend.saveEnvelope(fid, env).catch((e) => showToast(e.message)),
+    saveEnvelope,
     updateFamily: (patch) => backend.updateFamily(fid, patch).catch((e) => showToast(e.message)),
   };
 
@@ -160,6 +188,7 @@ function Budget({ backend, user, fid }) {
     <${TxSheet} opts=${txOpts} onClose=${() => setTxOpts(null)} />
     <${EnvelopeSheet} env=${envEdit} onClose=${() => setEnvEdit(null)} />
     <${SummarySheet} open=${summaryOpen} onClose=${() => setSummaryOpen(false)} />
+    <${IncomeSheet} open=${incomeOpen} onClose=${() => setIncomeOpen(false)} />
   <//>`;
 }
 

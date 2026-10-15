@@ -7,12 +7,12 @@ import { formatMoney } from '../lib/money.js';
 
 export function SummarySheet({ open, onClose }) {
   const app = useApp();
-  const { envelopes, txs, prevPeriod, family, user, today } = app;
+  const { envelopes, txs, prevPeriod, family, user, today, prevPlan } = app;
   const savings = envelopes.filter((e) => e.kind === 'savings' && !e.archived);
   const [target, setTarget] = useState(savings[0]?.id || '');
   if (!open) return null;
 
-  const s = periodSummary({ envelopes, txs, period: prevPeriod });
+  const s = periodSummary({ envelopes, txs, period: prevPeriod, plan: prevPlan });
   const markDone = () => app.updateFamily({ [`summaryDone.${prevPeriod.start}`]: true });
   const maxSpent = Math.max(1, ...s.rows.map((r) => Math.max(r.limit, r.spent)));
 

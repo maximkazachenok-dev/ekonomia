@@ -30,7 +30,7 @@ import {
   updateDoc,
 } from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js';
 
-import { startingTransaction } from '../lib/budget.js';
+import { startingTransaction, initialPlan } from '../lib/budget.js';
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // без 0/O и 1/I
 
@@ -134,7 +134,7 @@ export function createFirebaseBackend(config) {
       );
     },
 
-    async createFamily(user, { envelopes, ...family }) {
+    async createFamily(user, { envelopes, income, periodStart, ...family }) {
       const fref = doc(collection(db, 'families'));
       const fid = fref.id;
       const code = makeCode();
@@ -148,11 +148,21 @@ export function createFirebaseBackend(config) {
         createdAt: Date.now(),
       });
       batch.set(doc(db, 'invites', code), { familyId: fid });
-      envelopes.forEach(({ initialSpent, ...e }, i) => {
+      const created = envelopes.map(({ initialSpent, ...e }, i) => {
         const eref = doc(famCol(fid, 'envelopes'));
-        batch.set(eref, { order: i, archived: false, balance: 0, ...e });
         if (initialSpent) batch.set(doc(famCol(fid, 'transactions')), startingTransaction(user, eref.id, initialSpent));
+        return { ref: eref, data: { order: i, archived: false, balance: 0, ...e, id: eref.id } };
       });
+      if (income != null && periodStart) {
+        const plan = initialPlan(user, income, created.map((c) => c.data));
+        batch.set(fam(fid, 'periods', periodStart), plan);
+        const main = created.find((c) => c.data.id === plan.mainEnvelopeId);
+        if (main) main.data.limit = plan.free;
+      }
+      for (const { ref, data } of created) {
+        const { id, ...rest } = data;
+        batch.set(ref, rest);
+      }
       batch.set(doc(db, 'users', user.uid), { familyId: fid });
       await batch.commit();
       return fid;
@@ -206,6 +216,22 @@ export function createFirebaseBackend(config) {
           ),
         (e) => onError(humanize(e)),
       );
+    },
+
+    // Планы периодов (доход и обязательные статьи): { 'YYYY-MM-DD начала': план }
+    watchPeriods(fid, cb) {
+      return onSnapshot(
+        famCol(fid, 'periods'),
+        (s) => cb(Object.fromEntries(s.docs.map((d) => [d.id, d.data()]))),
+        (e) => onError(humanize(e)),
+      );
+    },
+
+    async savePeriod(fid, start, plan, envelopeUpdates = []) {
+      const batch = writeBatch(db);
+      batch.set(fam(fid, 'periods', start), plan);
+      for (const { id, ...patch } of envelopeUpdates) batch.update(fam(fid, 'envelopes', id), patch);
+      commit(batch);
     },
 
     async fetchAllTransactions(fid) {

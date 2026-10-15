@@ -1,5 +1,8 @@
 // Запуск: jsc -m tests/budget.test.js  (или открыть tests/index.html в браузере)
-import { getPeriod, previousPeriod, dailyAllowance, envelopeProgress, periodSummary, sumExpenses } from '../js/lib/budget.js';
+import {
+  getPeriod, previousPeriod, dailyAllowance, envelopeProgress, periodSummary, sumExpenses,
+  mainDailyEnvelope, mandatoryEnvelopes, planPeriod, buildPlan, applyEnvelopeToPlan, envelopeLimit,
+} from '../js/lib/budget.js';
 import { parseAmount, formatAmount, toInputString } from '../js/lib/money.js';
 import { pluralDays, addDays, daysBetween } from '../js/lib/dates.js';
 
@@ -126,6 +129,43 @@ eq([pluralDays(1), pluralDays(3), pluralDays(5), pluralDays(11), pluralDays(21),
   ['1 день', '3 дня', '5 дней', '11 дней', '21 день', '22 дня'], 'склонение дней');
 eq(addDays('2026-03-28', 2), '2026-03-30', 'переход на летнее время не ломает дни');
 eq(daysBetween('2026-10-25', '2026-10-26'), 1, 'переход на зимнее время');
+
+// ── Доход и обязательные статьи ──
+const envs2 = [
+  { id: 'shop', kind: 'daily', limit: 100000, name: 'Покупки' },
+  { id: 'beauty', kind: 'period', limit: 30000 },
+  { id: 'fuel', kind: 'period', limit: 40000 },
+  { id: 'rest', kind: 'period', limit: 20000 },
+  { id: 'save', kind: 'savings', monthly: 300000, goal: 1000000 },
+  { id: 'old', kind: 'period', limit: 99900, archived: true },
+];
+eq(mainDailyEnvelope(envs2).id, 'shop', 'главный дневной конверт');
+eq(mandatoryEnvelopes(envs2).map((e) => e.id), ['beauty', 'fuel', 'rest', 'save'], 'обязательные: без главного и скрытых');
+
+// Пример владельца: доход 5000, обязательные 300 + 400 + 200 + 3000 = 3900 → свободно 1100
+let plan = buildPlan({ income: 500000, envelopes: envs2 });
+eq(plan, { income: 500000, mandatory: { beauty: 30000, fuel: 40000, rest: 20000, save: 300000 }, free: 110000, mainEnvelopeId: 'shop' }, 'план: свободно = доход − обязательные');
+eq(planPeriod({ income: 500000, mandatory: plan.mandatory, days: 31 }), { mandatoryTotal: 390000, free: 110000, perDay: 3548 }, 'в среднем ≈ 35,48 в день на 31 день');
+eq(buildPlan({ income: 500000, envelopes: envs2, amounts: { beauty: 50000 } }).free, 90000, 'исправленная сумма статьи учитывается');
+eq(planPeriod({ income: 300000, mandatory: plan.mandatory, days: 31 }).perDay, 0, 'обязательные больше дохода: в день 0');
+eq(planPeriod({ income: 300000, mandatory: plan.mandatory, days: 31 }).free, -90000, 'обязательные больше дохода: свободно с минусом');
+
+// Сумма на период для конверта
+eq(envelopeLimit(envs2[0], plan), 110000, 'дневной конверт получает свободные деньги');
+eq(envelopeLimit(envs2[1], plan), 30000, 'статья — из плана');
+eq(envelopeLimit(envs2[0], null), 100000, 'без дохода — старая сумма конверта');
+eq(envelopeLimit({ id: 'new', kind: 'period', limit: 5000 }, plan), 5000, 'статья не из плана — сумма конверта');
+
+// Правка статьи посреди периода
+eq(applyEnvelopeToPlan(plan, { ...envs2[1], limit: 50000 }).free, 90000, 'статья выросла — свободных меньше');
+eq(applyEnvelopeToPlan(plan, { ...envs2[1], archived: true }).free, 140000, 'статью скрыли — свободных больше');
+eq(applyEnvelopeToPlan(plan, { id: 'pharm', kind: 'period', limit: 10000 }).free, 100000, 'новая статья вычитается');
+eq(applyEnvelopeToPlan(plan, { ...envs2[0], limit: 1 }), plan, 'главный конверт план не меняет');
+eq(applyEnvelopeToPlan(null, envs2[1]), null, 'без плана ничего не делаем');
+
+// Итоги берут суммы из плана того периода
+const sum2 = periodSummary({ envelopes: envs2, txs: [tx('2026-10-11', 100000), tx('2026-10-12', 10000, 'beauty')], period, plan });
+eq(sum2.rows.map((r) => [r.envelope.id, r.limit, r.saved]), [['shop', 110000, 10000], ['beauty', 30000, 20000], ['fuel', 40000, 40000], ['rest', 20000, 20000]], 'итоги по плану периода');
 
 out(`\n${failed ? '✗' : '✓'} Пройдено: ${passed}, упало: ${failed}`);
 if (typeof globalThis.__testResult === 'function') globalThis.__testResult(passed, failed);

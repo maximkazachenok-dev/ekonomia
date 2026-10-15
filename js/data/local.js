@@ -1,5 +1,5 @@
 // Локальный режим: всё в localStorage этого устройства, без входа и синхронизации.
-import { startingTransaction as startingTx } from '../lib/budget.js';
+import { startingTransaction as startingTx, initialPlan } from '../lib/budget.js';
 
 const KEY = 'ekonomia:v1';
 const LOCAL_USER = { uid: 'local', name: 'Я', email: null };
@@ -56,12 +56,13 @@ export const localBackend = {
     return watch(() => (db.family ? { familyId: db.family.id } : null), cb);
   },
 
-  async createFamily(user, { envelopes, ...family }) {
+  async createFamily(user, { envelopes, income, periodStart, ...family }) {
     const id = 'local';
     db = {
       family: { id, ...family, members: [user.uid], memberNames: { [user.uid]: user.name }, summaryDone: {} },
       envelopes: {},
       transactions: {},
+      periods: {},
     };
     envelopes.forEach(({ initialSpent, ...e }, i) => {
       const eid = newId();
@@ -71,8 +72,26 @@ export const localBackend = {
         db.transactions[tid] = { id: tid, ...startingTx(user, eid, initialSpent) };
       }
     });
+    if (income != null && periodStart) {
+      const plan = initialPlan(user, income, Object.values(db.envelopes));
+      db.periods[periodStart] = plan;
+      if (plan.mainEnvelopeId) db.envelopes[plan.mainEnvelopeId].limit = plan.free;
+    }
     save();
     return id;
+  },
+
+  watchPeriods(fid, cb) {
+    return watch(() => ({ ...(db.periods || {}) }), cb);
+  },
+
+  // План периода (доход и обязательные статьи) + новые суммы статей, если их поправили при вводе дохода
+  async savePeriod(fid, start, plan, envelopeUpdates = []) {
+    db.periods = { ...(db.periods || {}), [start]: plan };
+    for (const { id, ...patch } of envelopeUpdates) {
+      if (db.envelopes[id]) db.envelopes[id] = { ...db.envelopes[id], ...patch };
+    }
+    save();
   },
 
   async joinFamily() {
