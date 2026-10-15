@@ -1,5 +1,5 @@
 // Локальный режим: всё в localStorage этого устройства, без входа и синхронизации.
-import { startingTransaction as startingTx, initialPlan } from '../lib/budget.js';
+import { startingTransaction as startingTx, initialPlan, DEFAULT_SHOPS } from '../lib/budget.js';
 
 const KEY = 'ekonomia:v1';
 const LOCAL_USER = { uid: 'local', name: 'Я', email: null };
@@ -79,6 +79,32 @@ export const localBackend = {
     }
     save();
     return id;
+  },
+
+  // Разделы покупок (магазины и категории)
+  watchShops(fid, cb) {
+    return watch(() => Object.values(db.shops || {}).sort((a, b) => a.order - b.order), cb);
+  },
+
+  async saveShop(fid, shop) {
+    db.shops ||= {};
+    const id = shop.id || newId();
+    db.shops[id] = { archived: false, ...db.shops[id], ...shop, id };
+    save();
+    return id;
+  },
+
+  // Разделы по умолчанию: добавляем только недостающие, имя и «скрыт» не трогаем
+  async ensureDefaultShops() {
+    db.shops ||= {};
+    let changed = false;
+    for (const s of DEFAULT_SHOPS) {
+      if (!db.shops[s.id]) {
+        db.shops[s.id] = { archived: false, ...s };
+        changed = true;
+      }
+    }
+    if (changed) save();
   },
 
   watchPeriods(fid, cb) {

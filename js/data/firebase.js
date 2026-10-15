@@ -30,7 +30,7 @@ import {
   updateDoc,
 } from 'https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js';
 
-import { startingTransaction, initialPlan } from '../lib/budget.js';
+import { startingTransaction, initialPlan, DEFAULT_SHOPS } from '../lib/budget.js';
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // без 0/O и 1/I
 
@@ -216,6 +216,33 @@ export function createFirebaseBackend(config) {
           ),
         (e) => onError(humanize(e)),
       );
+    },
+
+    // Разделы покупок (магазины и категории)
+    watchShops(fid, cb) {
+      return onSnapshot(
+        famCol(fid, 'shops'),
+        (s) => cb(s.docs.map((d) => ({ id: d.id, ...d.data() })).sort((a, b) => a.order - b.order)),
+        (e) => onError(humanize(e)),
+      );
+    },
+
+    async saveShop(fid, shop) {
+      const { id, ...data } = shop;
+      const ref = id ? fam(fid, 'shops', id) : doc(famCol(fid, 'shops'));
+      const batch = writeBatch(db);
+      if (id) batch.update(ref, data);
+      else batch.set(ref, { archived: false, ...data });
+      commit(batch);
+      return ref.id;
+    },
+
+    // Разделы по умолчанию. Слияние без поля name: переименование и «скрыт» владельца не затираются,
+    // даже если оба телефона запишут это одновременно.
+    async ensureDefaultShops(fid) {
+      const batch = writeBatch(db);
+      for (const { id, ...s } of DEFAULT_SHOPS) batch.set(fam(fid, 'shops', id), s, { merge: true });
+      commit(batch);
     },
 
     // Планы периодов (доход и обязательные статьи): { 'YYYY-MM-DD начала': план }

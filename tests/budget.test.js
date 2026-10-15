@@ -2,6 +2,7 @@
 import {
   getPeriod, previousPeriod, dailyAllowance, envelopeProgress, periodSummary, sumExpenses,
   mainDailyEnvelope, mandatoryEnvelopes, planPeriod, buildPlan, applyEnvelopeToPlan, envelopeLimit,
+  itemsTotal, shopTotals, itemSuggestions, lastPrice, shopName,
 } from '../js/lib/budget.js';
 import { parseAmount, formatAmount, toInputString } from '../js/lib/money.js';
 import { pluralDays, addDays, daysBetween } from '../js/lib/dates.js';
@@ -166,6 +167,29 @@ eq(applyEnvelopeToPlan(null, envs2[1]), null, 'без плана ничего н
 // Итоги берут суммы из плана того периода
 const sum2 = periodSummary({ envelopes: envs2, txs: [tx('2026-10-11', 100000), tx('2026-10-12', 10000, 'beauty')], period, plan });
 eq(sum2.rows.map((r) => [r.envelope.id, r.limit, r.saved]), [['shop', 110000, 10000], ['beauty', 30000, 20000], ['fuel', 40000, 40000], ['rest', 20000, 20000]], 'итоги по плану периода');
+
+// ── Разделы покупок ──
+const buy = (date, shopId, items, extra = {}) => ({ date, envelopeId: 'shop', type: 'expense', shopId, items, amount: itemsTotal(items), ...extra });
+const purchases = [
+  buy('2026-10-14', 'gippo', [{ name: 'Хлеб', amount: 350 }, { name: 'Молоко', amount: 280 }]),
+  buy('2026-10-12', 'gippo', [{ name: 'хлеб ', amount: 320 }]),
+  buy('2026-10-11', 'household', [{ name: 'Порошок', amount: 890 }, { name: 'Мыло', amount: 200 }]),
+  { date: '2026-10-11', envelopeId: 'shop', type: 'expense', shopId: 'other', amount: 450 },
+  buy('2026-09-20', 'gippo', [{ name: 'Хлеб', amount: 300 }]),
+];
+eq(itemsTotal([{ amount: 350 }, { amount: 280 }]), 630, 'сумма позиций: 3,50 + 2,80 = 6,30');
+eq(itemsTotal(), 0, 'без позиций — 0');
+eq(shopTotals(purchases, period.start, period.end), {
+  gippo: { spent: 950, count: 2 }, household: { spent: 1090, count: 1 }, other: { spent: 450, count: 1 },
+}, 'траты по разделам за период (сентябрь не входит)');
+const sugg = itemSuggestions(purchases);
+eq(lastPrice(sugg, 'хлеб'), 350, 'подсказка: последняя цена хлеба');
+eq(lastPrice(sugg, ' ХЛЕБ'), 350, 'подсказка не зависит от регистра и пробелов');
+eq(lastPrice(sugg, 'сыр'), null, 'неизвестный товар — без подсказки');
+eq(shopName({ defaultName: 'Другое' }), 'Другое', 'имя раздела по умолчанию');
+eq(shopName({ name: 'Мелочи', defaultName: 'Другое' }), 'Мелочи', 'переименованный раздел');
+// Покупки идут в главный дневной конверт — дневной лимит считает их как обычные траты
+eq(dailyAllowance({ limit: 110000, txs: purchases, envelopeId: 'shop', today: '2026-10-15', period }).spentTotal, 2490, 'покупки в разделах вычитаются из дневного лимита');
 
 out(`\n${failed ? '✗' : '✓'} Пройдено: ${passed}, упало: ${failed}`);
 if (typeof globalThis.__testResult === 'function') globalThis.__testResult(passed, failed);

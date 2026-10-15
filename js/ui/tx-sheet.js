@@ -3,11 +3,12 @@ import { html, useState, useEffect } from '../lib/preact.js';
 import { BottomSheet, Numpad, useApp } from './common.js';
 import { parseAmount, toInputString, currencySymbol } from '../lib/money.js';
 import { addDays } from '../lib/dates.js';
+import { mainDailyEnvelope, shopName } from '../lib/budget.js';
 
 // opts: { tx } — редактирование; { envelopeId, type } — новая операция
 export function TxSheet({ opts, onClose }) {
   const app = useApp();
-  const { envelopes, envById, today, family, user } = app;
+  const { envelopes, envById, today, family, user, shops } = app;
   const editing = opts?.tx || null;
   const presetEnv = editing ? envById[editing.envelopeId] : envById[opts?.envelopeId];
   const isSavings = presetEnv?.kind === 'savings';
@@ -21,9 +22,11 @@ export function TxSheet({ opts, onClose }) {
   const [note, setNote] = useState('');
   const [date, setDate] = useState(today);
   const [showMore, setShowMore] = useState(false);
+  const [shopId, setShopId] = useState('other');
 
   useEffect(() => {
     if (!opts) return;
+    setShopId('other');
     setAmount(editing ? toInputString(editing.amount) : '');
     setEnvelopeId(defaultEnv);
     setType(editing?.type || opts.type || 'expense');
@@ -37,6 +40,8 @@ export function TxSheet({ opts, onClose }) {
   const kop = parseAmount(amount || '0');
   const valid = kop > 0 && envelopeId;
   const env = envById[envelopeId];
+  // Траты из свободных денег относятся к разделу (магазину или «Другое»)
+  const isMainDaily = !editing && envelopeId === mainDailyEnvelope(envelopes)?.id;
 
   const title = editing
     ? 'Изменить запись'
@@ -48,6 +53,7 @@ export function TxSheet({ opts, onClose }) {
     e?.preventDefault();
     if (!valid) return;
     const data = { amount: kop, envelopeId, type, note: note.trim(), date };
+    if (isMainDaily) data.shopId = shopId;
     if (editing) app.updateTx(editing, data);
     else app.addTx({ ...data, createdBy: { uid: user.uid, name: user.name }, createdAt: Date.now() });
     onClose();
@@ -77,6 +83,15 @@ export function TxSheet({ opts, onClose }) {
             onClick=${() => setEnvelopeId(e.id)}
           >
             <span class="chip__icon">${e.icon}</span>${e.name}
+          </button>`,
+        )}
+      </div>`}
+
+      ${isMainDaily &&
+      html`<div class="chips chips--scroll" role="radiogroup" aria-label="Раздел">
+        ${shops.filter((s) => !s.archived).map(
+          (s) => html`<button type="button" role="radio" aria-checked=${s.id === shopId} class=${`chip chip--small ${s.id === shopId ? 'chip--active' : ''}`} onClick=${() => setShopId(s.id)}>
+            <span class="chip__icon">${s.icon || '🏪'}</span>${shopName(s)}
           </button>`,
         )}
       </div>`}

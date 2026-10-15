@@ -1,7 +1,7 @@
 import { html, useState } from '../lib/preact.js';
 import { useApp, Icon, KIND_LABELS, showToast, Money } from '../ui/common.js';
 import { CURRENCIES, formatAmount } from '../lib/money.js';
-import { envelopeLimit } from '../lib/budget.js';
+import { envelopeLimit, shopName } from '../lib/budget.js';
 
 function downloadFile(name, content, type) {
   const blob = new Blob([content], { type });
@@ -15,14 +15,17 @@ function downloadFile(name, content, type) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-async function exportCsv({ backend, fid, envById, family, today }) {
+async function exportCsv({ backend, fid, envById, shopById, family, today }) {
   const txs = await backend.fetchAllTransactions(fid);
   const esc = (s) => `"${String(s ?? '').replace(/"/g, '""')}"`;
-  const rows = [['Дата', 'Конверт', 'Тип', 'Сумма', 'Заметка', 'Кто'].join(';')];
+  const money = (kop) => formatAmount(kop, { forceKop: true }).replace(/\u00A0/g, '');
+  const rows = [['Дата', 'Конверт', 'Раздел', 'Тип', 'Сумма', 'Товары', 'Заметка', 'Кто'].join(';')];
   for (const t of txs) {
     const env = envById[t.envelopeId];
     const type = env?.kind === 'savings' ? (t.type === 'deposit' ? 'Отложено' : 'Взято из копилки') : 'Трата';
-    rows.push([t.date, esc(env?.name || '—'), type, formatAmount(t.amount, { forceKop: true }).replace(/ /g, ''), esc(t.note), esc(t.createdBy?.name)].join(';'));
+    const shop = t.shopId ? shopName(shopById[t.shopId]) : '';
+    const items = (t.items || []).map((it) => `${it.name} ${money(it.amount)}`).join('; ');
+    rows.push([t.date, esc(env?.name || '—'), esc(shop), type, money(t.amount), esc(items), esc(t.note), esc(t.createdBy?.name)].join(';'));
   }
   // BOM, чтобы Excel правильно открыл кириллицу
   downloadFile(`budget-${today}.csv`, '﻿' + rows.join('\r\n'), 'text/csv;charset=utf-8');

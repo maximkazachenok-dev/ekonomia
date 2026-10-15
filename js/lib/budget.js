@@ -86,6 +86,52 @@ export function envelopeProgress({ limit, txs, envelopeId, period }) {
   return { spent, left, percent, status };
 }
 
+// ── Разделы покупок (магазины и категории) ──
+
+// Разделы, которые есть в каждом бюджете. Фиксированные id, чтобы два телефона не создали дубли.
+export const DEFAULT_SHOPS = [
+  // Большой order — в конце списка, после магазинов владельца (у них order = время создания)
+  { id: 'household', defaultName: 'Бытовая химия и гигиена', icon: '🧴', order: 9e15 },
+  { id: 'other', defaultName: 'Другое', icon: '🧾', order: 9e15 + 1 },
+];
+
+export const shopName = (shop) => shop?.name || shop?.defaultName || 'Без раздела';
+
+// Сумма покупки: сумма позиций, если они есть, иначе введённая общая сумма.
+export function itemsTotal(items = []) {
+  return items.reduce((s, it) => s + (it.amount || 0), 0);
+}
+
+// Траты и число покупок по разделам за даты [from, to).
+export function shopTotals(txs, from, to) {
+  const out = {};
+  for (const t of txs) {
+    if (!t.shopId || t.type !== 'expense' || t.date < from || t.date >= to) continue;
+    const r = (out[t.shopId] ||= { spent: 0, count: 0 });
+    r.spent += t.amount;
+    r.count += 1;
+  }
+  return out;
+}
+
+const normName = (s) => s.trim().toLowerCase().replace(/ё/g, 'е');
+
+// Подсказки для ввода позиций: название → последняя цена (txs отсортированы от новых к старым).
+export function itemSuggestions(txs) {
+  const map = new Map();
+  for (const t of txs) {
+    for (const it of t.items || []) {
+      const key = normName(it.name);
+      if (key && !map.has(key)) map.set(key, { name: it.name.trim(), amount: it.amount });
+    }
+  }
+  return map;
+}
+
+export function lastPrice(suggestions, name) {
+  return suggestions.get(normName(name || ''))?.amount ?? null;
+}
+
 // Трата «до начала учёта», когда бюджет создают посреди периода.
 export function startingTransaction(user, envelopeId, { amount, date }) {
   return {

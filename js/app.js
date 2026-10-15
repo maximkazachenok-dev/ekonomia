@@ -4,6 +4,9 @@ import { TxSheet } from './ui/tx-sheet.js';
 import { EnvelopeSheet } from './ui/envelope-sheet.js';
 import { SummarySheet } from './ui/summary-sheet.js';
 import { IncomeSheet } from './ui/income-sheet.js';
+import { PurchaseSheet } from './ui/purchase-sheet.js';
+import { ShopSheet } from './ui/shop-sheet.js';
+import { ShopsScreen } from './screens/shops.js';
 import { HomeScreen } from './screens/home.js';
 import { HistoryScreen } from './screens/history.js';
 import { SavingsScreen } from './screens/savings.js';
@@ -11,7 +14,7 @@ import { SettingsScreen } from './screens/settings.js';
 import { Onboarding } from './screens/onboarding.js';
 import { LoginScreen } from './screens/login.js';
 import { createBackend, balanceChangesFor } from './data/store.js';
-import { getPeriod, previousPeriod, periodSummary, applyEnvelopeToPlan } from './lib/budget.js';
+import { getPeriod, previousPeriod, periodSummary, applyEnvelopeToPlan, mainDailyEnvelope, DEFAULT_SHOPS, shopName } from './lib/budget.js';
 import { todayISO } from './lib/dates.js';
 import { formatMoney } from './lib/money.js';
 
@@ -32,6 +35,7 @@ function useToday() {
 
 const TABS = [
   { id: 'home', label: 'Главная', icon: Icon.home },
+  { id: 'shops', label: 'Магазины', icon: Icon.bag },
   { id: 'history', label: 'История', icon: Icon.list },
   { id: 'savings', label: 'Копилки', icon: Icon.piggy },
   { id: 'settings', label: 'Настройки', icon: Icon.settings },
@@ -53,6 +57,10 @@ function Budget({ backend, user, fid }) {
   const [incomeOpen, setIncomeOpen] = useState(false);
   const [extraPeriods, setExtraPeriods] = useState(0);
   const [periods, setPeriods] = useState(null);
+  const [shops, setShops] = useState(null);
+  const [purchaseOpts, setPurchaseOpts] = useState(null);
+  const [shopEdit, setShopEdit] = useState(null);
+  const [openShopId, setOpenShopId] = useState(null);
 
   const payday = family?.payday || 10;
   const period = useMemo(() => getPeriod(today, payday), [today, payday]);
@@ -68,8 +76,18 @@ function Budget({ backend, user, fid }) {
   useEffect(() => backend.watchEnvelopes(fid, setEnvelopes), [fid]);
   useEffect(() => backend.watchTransactions(fid, since, setTxs), [fid, since]);
   useEffect(() => backend.watchPeriods(fid, setPeriods), [fid]);
+  useEffect(() => backend.watchShops(fid, setShops), [fid]);
+
+  // Разделы «Другое» и «Бытовая химия и гигиена» есть в каждом бюджете (в том числе созданном до их появления)
+  useEffect(() => {
+    if (shops && DEFAULT_SHOPS.some((d) => !shops.find((s) => s.id === d.id))) backend.ensureDefaultShops(fid);
+  }, [shops === null]);
 
   const envById = useMemo(() => Object.fromEntries((envelopes || []).map((e) => [e.id, e])), [envelopes]);
+  const shopById = useMemo(() => Object.fromEntries((shops || []).map((s) => [s.id, s])), [shops]);
+
+  // Покупку с разделом правим в шторке покупки (там позиции), остальное — в обычной шторке траты
+  const openTx = useCallback((opts) => (opts?.tx?.shopId ? setPurchaseOpts({ tx: opts.tx }) : setTxOpts(opts)), []);
 
   // Ярлык «Добавить трату» (долгое нажатие на иконку) открывает ввод сразу
   const ready = Boolean(family && envelopes && txs);
@@ -84,14 +102,16 @@ function Budget({ backend, user, fid }) {
       const p = backend.addTransaction(fid, tx, balanceChangesFor(envById, null, tx));
       if (silent) return;
       const env = envById[tx.envelopeId];
+      const shop = tx.shopId && shopById[tx.shopId];
+      const where = shop ? `${shop.icon || '🏪'} ${shopName(shop)}` : `${env.icon} ${env.name}`;
       p.then((id) =>
-        showToast(`${formatMoney(tx.amount, family.currency)} · ${env.icon} ${env.name}`, {
+        showToast(`${formatMoney(tx.amount, family.currency)} · ${where}`, {
           label: 'Отменить',
           run: () => backend.deleteTransaction(fid, id, balanceChangesFor(envById, tx, null)),
         }),
       ).catch((e) => showToast(e.message));
     },
-    [fid, envById, family],
+    [fid, envById, shopById, family],
   );
 
   const updateTx = useCallback(
@@ -110,7 +130,7 @@ function Budget({ backend, user, fid }) {
     [fid, envById, addTx],
   );
 
-  if (!family || !envelopes || !txs || !periods) return html`<${Splash} />`;
+  if (!family || !envelopes || !txs || !periods || !shops) return html`<${Splash} />`;
 
   // План текущего и прошлого периода (доход и обязательные статьи). Пока дохода нет — null.
   const plan = periods[period.start] || null;
@@ -150,8 +170,15 @@ function Budget({ backend, user, fid }) {
     since,
     loadEarlier: () => setExtraPeriods((n) => n + 1),
     setTab,
-    openTx: setTxOpts,
+    openTx,
     openEnvelope: setEnvEdit,
+    shops,
+    shopById,
+    openShopId,
+    setOpenShopId,
+    openPurchase: setPurchaseOpts,
+    openShopEdit: setShopEdit,
+    saveShop: (shop) => backend.saveShop(fid, shop).catch((e) => showToast(e.message)),
     openSummary: () => setSummaryOpen(true),
     summaryPending,
     plan,
@@ -165,7 +192,7 @@ function Budget({ backend, user, fid }) {
     updateFamily: (patch) => backend.updateFamily(fid, patch).catch((e) => showToast(e.message)),
   };
 
-  const Screen = { home: HomeScreen, history: HistoryScreen, savings: SavingsScreen, settings: SettingsScreen }[tab];
+  const Screen = { home: HomeScreen, shops: ShopsScreen, history: HistoryScreen, savings: SavingsScreen, settings: SettingsScreen }[tab];
   const hasSpendable = envelopes.some((e) => !e.archived && e.kind !== 'savings');
 
   return html`<${AppContext.Provider} value=${ctx}>
@@ -176,6 +203,9 @@ function Budget({ backend, user, fid }) {
     ${(tab === 'home' || tab === 'history') &&
     hasSpendable &&
     html`<button class="fab" onClick=${() => setTxOpts({})} aria-label="Добавить трату">${Icon.plus}</button>`}
+    ${tab === 'shops' &&
+    mainDailyEnvelope(envelopes) &&
+    html`<button class="fab" onClick=${() => setPurchaseOpts({ shopId: openShopId || 'other' })} aria-label="Добавить покупку">${Icon.plus}</button>`}
 
     <nav class="tabbar">
       ${TABS.map(
@@ -189,6 +219,8 @@ function Budget({ backend, user, fid }) {
     <${EnvelopeSheet} env=${envEdit} onClose=${() => setEnvEdit(null)} />
     <${SummarySheet} open=${summaryOpen} onClose=${() => setSummaryOpen(false)} />
     <${IncomeSheet} open=${incomeOpen} onClose=${() => setIncomeOpen(false)} />
+    <${PurchaseSheet} opts=${purchaseOpts} onClose=${() => setPurchaseOpts(null)} />
+    <${ShopSheet} shop=${shopEdit} onClose=${() => setShopEdit(null)} />
   <//>`;
 }
 

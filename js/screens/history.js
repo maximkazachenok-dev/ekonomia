@@ -1,22 +1,31 @@
 import { html, useState, useMemo } from '../lib/preact.js';
 import { useApp, Money } from '../ui/common.js';
 import { relativeDay, formatDay } from '../lib/dates.js';
+import { shopName } from '../lib/budget.js';
 
 export function TxRow({ tx, showDate = false }) {
-  const { envById, openTx, user, family } = useApp();
+  const { envById, shopById, openTx, user, family } = useApp();
   const env = envById[tx.envelopeId];
   if (!env) return null;
+  const shop = tx.shopId ? shopById[tx.shopId] : null;
   const isSave = env.kind === 'savings';
   const who = tx.createdBy?.uid === user.uid ? 'Я' : tx.createdBy?.name || '—';
   const multi = (family.members || []).length > 1;
   const sign = isSave ? (tx.type === 'deposit' ? '+' : '−') : '';
+  // Покупка в разделе: «Гиппо» и список товаров; обычная трата: заметка или конверт
+  const title = shop ? shopName(shop) : tx.note || env.name;
+  const meta = [
+    tx.items?.length ? tx.items.map((it) => it.name).join(', ') : shop ? tx.note : tx.note ? env.name : '',
+    multi ? who : '',
+    showDate ? formatDay(tx.date, { short: true }) : '',
+  ].filter(Boolean);
   return html`<li>
     <button class="tx-row" onClick=${() => openTx({ tx })}>
-      <span class="env-row__icon" style=${{ background: env.color + '22' }}>${env.icon}</span>
+      <span class="env-row__icon" style=${{ background: env.color + '22' }}>${shop ? shop.icon || '🏪' : env.icon}</span>
       <span class="tx-row__main">
-        <span class="tx-row__name">${tx.note || env.name}</span>
+        <span class="tx-row__name">${title}</span>
         <span class="tx-row__meta muted">
-          ${tx.note ? env.name : ''}${tx.note && (multi || showDate) ? ' · ' : ''}${multi ? who : ''}${multi && showDate ? ' · ' : ''}${showDate ? formatDay(tx.date, { short: true }) : ''}
+          ${meta.join(' · ')}
           ${tx.pending ? html` · <span class="pending" title="Отправится, когда появится интернет">⏳</span>` : ''}
         </span>
       </span>
@@ -28,21 +37,20 @@ export function TxRow({ tx, showDate = false }) {
 }
 
 export function HistoryScreen() {
-  const { txs, envelopes, envById, today, family, user, since, loadEarlier } = useApp();
+  const { txs, envelopes, envById, shops, today, family, user, since, loadEarlier } = useApp();
+  // Фильтр: 'all', id конверта или 'shop:<id>' для раздела покупок
   const [envFilter, setEnvFilter] = useState('all');
   const [who, setWho] = useState('all');
   const members = Object.entries(family.memberNames || {});
 
+  const matches = (t) =>
+    envFilter === 'all' || (envFilter.startsWith('shop:') ? t.shopId === envFilter.slice(5) : t.envelopeId === envFilter);
+
   const filtered = useMemo(
-    () =>
-      txs.filter(
-        (t) =>
-          envById[t.envelopeId] &&
-          (envFilter === 'all' || t.envelopeId === envFilter) &&
-          (who === 'all' || t.createdBy?.uid === who),
-      ),
+    () => txs.filter((t) => envById[t.envelopeId] && matches(t) && (who === 'all' || t.createdBy?.uid === who)),
     [txs, envFilter, who, envById],
   );
+  const usedShops = shops.filter((s) => txs.some((t) => t.shopId === s.id));
 
   const groups = useMemo(() => {
     const m = new Map();
@@ -63,6 +71,11 @@ export function HistoryScreen() {
       ${used.map(
         (e) => html`<button class=${`chip chip--small ${envFilter === e.id ? 'chip--active' : ''}`} style=${{ '--chip': e.color }} onClick=${() => setEnvFilter(e.id)}>
           <span class="chip__icon">${e.icon}</span>${e.name}
+        </button>`,
+      )}
+      ${usedShops.map(
+        (s) => html`<button class=${`chip chip--small ${envFilter === `shop:${s.id}` ? 'chip--active' : ''}`} onClick=${() => setEnvFilter(`shop:${s.id}`)}>
+          <span class="chip__icon">${s.icon || '🏪'}</span>${shopName(s)}
         </button>`,
       )}
     </div>

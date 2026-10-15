@@ -405,6 +405,22 @@ label.btn { cursor: pointer; }
 .plan-line .pos .money { color: var(--ok); }
 .plan-line .neg .money { color: var(--over); }
 
+/* ── Покупки и разделы ─────────────────────────────── */
+.item-rows { display: flex; flex-direction: column; gap: 8px; }
+.item-row { display: grid; grid-template-columns: 1fr 96px 36px; gap: 8px; align-items: center; }
+.item-row__price { text-align: right; }
+.item-row__del { width: 36px; height: 36px; }
+.item-row__del svg { width: 18px; height: 18px; }
+.purchase-total { display: flex; justify-content: space-between; align-items: baseline; font-size: 20px; font-weight: 700; padding: 4px 2px; }
+.shop-head { display: flex; align-items: center; gap: 8px; padding: 8px 0 2px; }
+.shop-head .screen__title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.purchase { padding: 12px 16px; border-top: 1px solid var(--line); }
+.purchase:first-of-type { border-top: 0; }
+.purchase__btn { width: 100%; text-align: left; display: flex; flex-direction: column; gap: 4px; }
+.purchase__top { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; }
+.purchase__items { font-size: 14px; color: var(--muted); display: flex; flex-direction: column; gap: 2px; }
+.purchase__item { display: flex; justify-content: space-between; gap: 8px; }
+
 /* ── Копилки ────────────────────────────────────────── */
 .goal { display: flex; align-items: center; gap: 12px; }
 .goal__icon { width: 52px; height: 52px; border-radius: 16px; display: grid; place-items: center; font-size: 26px; }
