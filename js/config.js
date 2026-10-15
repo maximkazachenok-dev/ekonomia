@@ -1,16 +1,15 @@
-// Настройки Firebase. Пока здесь null, приложение работает в локальном режиме:
-// данные хранятся только на этом устройстве.
+// Настройки Firebase (проект ekonomia-d79f6). Эти ключи не секретные: они должны быть
+// открыты в браузере. Данные защищают правила доступа из firestore.rules.
 //
-// Чтобы вы с женой видели общий бюджет, создайте проект Firebase (инструкция в README.md)
-// и вставьте сюда объект firebaseConfig из консоли Firebase, например:
-//
-// export const firebaseConfig = {
-//   apiKey: 'AIza...',
-//   authDomain: 'my-budget.firebaseapp.com',
-//   projectId: 'my-budget',
-//   storageBucket: 'my-budget.appspot.com',
-//   messagingSenderId: '1234567890',
-//   appId: '1:1234567890:web:abcdef',
-// };
+// Если здесь поставить null, приложение вернётся в локальный режим:
+// данные будут храниться только на этом устройстве.
 
-export const firebaseConfig = null;
+export const firebaseConfig = {
+  apiKey: 'AIzaSyAKuXz9QoBq3f5Ep384n6FC43wGezTe9Xg',
+  authDomain: 'ekonomia-d79f6.firebaseapp.com',
+  projectId: 'ekonomia-d79f6',
+  storageBucket: 'ekonomia-d79f6.firebasestorage.app',
+  messagingSenderId: '1047989612891',
+  appId: '1:1047989612891:web:ba1b0cf62f2e210a99aa7e',
+  measurementId: 'G-0FLVRTYNM1',
+};

@@ -1,6 +1,6 @@
 // Service worker: приложение открывается без интернета.
 // При изменении файлов приложения увеличьте VERSION, чтобы телефоны получили обновление.
-const VERSION = 'v1.0.0';
+const VERSION = 'v1.0.1';
 const SHELL = `shell-${VERSION}`;
 const CDN = 'cdn-v1';
 
