@@ -113,6 +113,6 @@ export const ENVELOPE_COLORS = ['#1F9D6B', '#D9468A', '#7B61FF', '#E8833A', '#3B
 
 export const KIND_LABELS = {
   daily: 'Лимит на каждый день',
-  period: 'Обязательная статья',
-  savings: 'Копилка (цель)',
+  period: 'Категория расходов',
+  savings: 'Копилка (накопление)',
 };

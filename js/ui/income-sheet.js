@@ -1,92 +1,69 @@
-// Шторка «Доход на период»: доход минус обязательные статьи = свободные деньги, которые делятся по дням.
+// Шторка «Доход на период»: в день зарплаты вносится общая сумма дохода.
+// Сначала она вся свободна; распределение по категориям — отдельно, на главном экране.
 import { html, useState, useEffect } from '../lib/preact.js';
 import { BottomSheet, useApp, Money } from './common.js';
 import { parseAmount, toInputString, currencySymbol, formatMoney } from '../lib/money.js';
-import { buildPlan, planPeriod, mandatoryEnvelopes, mandatoryAmount, mainDailyEnvelope, dailyAllowance } from '../lib/budget.js';
+import { planPeriod, mainDailyEnvelope, dailyAllowance } from '../lib/budget.js';
 import { formatDay, pluralDays } from '../lib/dates.js';
 
 export function IncomeSheet({ open, onClose }) {
-  const { envelopes, plan, prevPlan, period, family, today, txs, savePlan } = useApp();
-  const items = mandatoryEnvelopes(envelopes);
+  const { envelopes, plan, prevPlan, period, family, today, txs, saveIncome } = useApp();
   const main = mainDailyEnvelope(envelopes);
   const [income, setIncome] = useState('');
-  const [amounts, setAmounts] = useState({});
 
   useEffect(() => {
-    if (!open) return;
-    setIncome(toInputString(plan?.income ?? prevPlan?.income ?? 0));
-    setAmounts(Object.fromEntries(items.map((e) => [e.id, toInputString(plan?.mandatory?.[e.id] ?? mandatoryAmount(e))])));
+    if (open) setIncome(plan ? toInputString(plan.income) : '');
   }, [open]);
 
   if (!open) return null;
 
   const cur = currencySymbol(family.currency);
-  const incomeKop = parseAmount(income || '0');
-  const amountsKop = Object.fromEntries(items.map((e) => [e.id, parseAmount(amounts[e.id] || '0')]));
-  const invalid = Number.isNaN(incomeKop) || Object.values(amountsKop).some(Number.isNaN);
-  const next = invalid ? null : buildPlan({ income: incomeKop, envelopes, amounts: amountsKop });
-  const totals = next && planPeriod({ income: next.income, mandatory: next.mandatory, days: period.days });
+  const kop = parseAmount(income || '0');
+  const valid = !Number.isNaN(kop) && kop > 0;
+  // Если доход исправляют посреди периода, уже распределённое остаётся распределённым
+  const allocated = plan ? Object.values(plan.mandatory).reduce((s, v) => s + v, 0) : 0;
+  const totals = valid ? planPeriod({ income: kop, mandatory: plan?.mandatory || {}, days: period.days }) : null;
   const midPeriod = today !== period.start;
-  const todayLimit =
-    next && main && midPeriod ? dailyAllowance({ limit: next.free, txs, envelopeId: main.id, today, period }).todayLimit : null;
+  const todayLimit = totals && main && midPeriod ? dailyAllowance({ limit: totals.free, txs, envelopeId: main.id, today, period }).todayLimit : null;
 
   const submit = (e) => {
     e.preventDefault();
-    if (!next || incomeKop <= 0) return;
-    // Новые суммы статей запоминаем: в следующем месяце они подставятся сами
-    const updates = items
-      .filter((env) => amountsKop[env.id] !== mandatoryAmount(env))
-      .map((env) => (env.kind === 'savings' ? { id: env.id, monthly: amountsKop[env.id] } : { id: env.id, limit: amountsKop[env.id] }));
-    if (main) updates.push({ id: main.id, limit: next.free });
-    savePlan(next, updates);
+    if (!valid) return;
+    saveIncome(kop);
     onClose();
   };
 
-  return html`<${BottomSheet} open=${true} onClose=${onClose} title="Доход на период">
+  return html`<${BottomSheet} open=${true} onClose=${onClose} title=${plan ? 'Изменить доход' : 'Доход на период'}>
     <form class="form" onSubmit=${submit}>
       <p class="muted">${formatDay(period.start)} — ${formatDay(period.end)}</p>
 
       <label class="field">
-        <span class="field__label">Сколько денег пришло (доход семьи)</span>
+        <span class="field__label">Сколько денег пришло (общий доход семьи)</span>
         <div class="input-money input-money--big">
-          <input class="input" inputmode="decimal" value=${income} onInput=${(e) => setIncome(e.target.value)} placeholder="0" />
+          <input class="input" inputmode="decimal" value=${income} onInput=${(e) => setIncome(e.target.value)} placeholder="0" autofocus />
           <span>${cur}</span>
         </div>
+        ${!plan && prevPlan?.income > 0 &&
+        html`<button type="button" class="link-btn" onClick=${() => setIncome(toInputString(prevPlan.income))}>
+          Как в прошлом месяце: ${formatMoney(prevPlan.income, family.currency)}
+        </button>`}
       </label>
 
-      ${items.length > 0 &&
-      html`<div class="field">
-        <span class="field__label">Обязательные статьи (можно поправить)</span>
-        <ul class="plan-rows">
-          ${items.map(
-            (e) => html`<li class="plan-row">
-              <span class="plan-row__icon" style=${{ background: e.color + '22' }}>${e.icon}</span>
-              <span class="plan-row__name">${e.name}${e.kind === 'savings' ? html`<small class="muted">в копилку</small>` : ''}</span>
-              <div class="input-money input-money--small">
-                <input class="input" inputmode="decimal" value=${amounts[e.id] ?? ''} placeholder="0" aria-label=${`Сумма для «${e.name}»`}
-                  onInput=${(ev) => setAmounts({ ...amounts, [e.id]: ev.target.value })} />
-                <span>${cur}</span>
-              </div>
-            </li>`,
-          )}
-        </ul>
-      </div>`}
-
       ${totals &&
-      incomeKop > 0 &&
-      html`<div class=${`plan-result ${next.free < 0 ? 'plan-result--bad' : ''}`}>
-        <div class="plan-result__row"><span>Доход</span><${Money} kop=${next.income} /></div>
-        <div class="plan-result__row"><span>Обязательные статьи</span><span>−<${Money} kop=${totals.mandatoryTotal} /></span></div>
-        <div class="plan-result__row plan-result__row--total"><span>Свободно до ${formatDay(period.end, { short: true })}</span><${Money} kop=${next.free} /></div>
-        ${next.free < 0
-          ? html`<p class="plan-result__note">Обязательные статьи больше дохода на ${formatMoney(-next.free, family.currency)}. Уменьшите какую-нибудь статью.</p>`
-          : html`<p class="plan-result__note">
-              ≈ <strong>${formatMoney(totals.perDay, family.currency)}</strong> в день в среднем на ${pluralDays(period.days)}
-              ${todayLimit !== null && html`<br />С учётом уже потраченного сегодня можно ≈ <strong>${formatMoney(Math.max(0, todayLimit), family.currency)}</strong>`}
-            </p>`}
+      html`<div class=${`plan-result ${totals.free < 0 ? 'plan-result--bad' : ''}`}>
+        ${allocated > 0 &&
+        html`<div class="plan-result__row"><span>Уже распределено</span><span>−<${Money} kop=${allocated} /></span></div>`}
+        <div class="plan-result__row plan-result__row--total"><span>Свободно до ${formatDay(period.end, { short: true })}</span><${Money} kop=${totals.free} /></div>
+        ${totals.free >= 0 &&
+        html`<p class="plan-result__note">
+          ≈ <strong>${formatMoney(totals.perDay, family.currency)}</strong> в день в среднем на ${pluralDays(period.days)}
+          ${todayLimit !== null && html`<br />С учётом уже потраченного сегодня можно ≈ <strong>${formatMoney(Math.max(0, todayLimit), family.currency)}</strong>`}
+        </p>`}
       </div>`}
 
-      <button type="submit" class="btn btn--primary btn--block btn--lg" disabled=${!next || incomeKop <= 0}>Сохранить</button>
+      ${!plan && html`<p class="field__hint">Дальше распределите деньги по категориям на главном экране — свободная сумма и дневной лимит будут уменьшаться.</p>`}
+
+      <button type="submit" class="btn btn--primary btn--block btn--lg" disabled=${!valid}>Сохранить</button>
     </form>
   <//>`;
 }

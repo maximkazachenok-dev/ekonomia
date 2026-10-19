@@ -1,5 +1,5 @@
 // Первый запуск: создать семейный бюджет (3 шага) или вступить по коду.
-// Шаги: день зарплаты → обязательные статьи → доход. Остаток делится по дням.
+// Шаги: день зарплаты → категории расходов → доход. Доход делится по дням; распределение — на главном экране.
 import { html, useState } from '../lib/preact.js';
 import { ENVELOPE_COLORS } from '../ui/common.js';
 import { parseAmount, currencySymbol, formatMoney, CURRENCIES } from '../lib/money.js';
@@ -7,15 +7,15 @@ import { getPeriod, planPeriod } from '../lib/budget.js';
 import { todayISO, formatDay, pluralDays, daysBetween } from '../lib/dates.js';
 
 const TEMPLATES = [
+  { key: 'savings', name: 'Накопление', icon: '🐷', kind: 'savings', on: true },
+  { key: 'car', name: 'Обслуживание авто', icon: '🔧', kind: 'period', on: true },
   { key: 'beauty', name: 'Бьюти', icon: '💅', kind: 'period', on: true },
-  { key: 'haircut', name: 'Стрижка', icon: '💇', kind: 'period', on: true },
-  { key: 'fuel', name: 'АЗС', icon: '⛽', kind: 'period', on: true },
-  { key: 'car', name: 'Ремонт авто', icon: '🔧', kind: 'period', on: true },
-  { key: 'rest', name: 'Отдых', icon: '✈️', kind: 'period', on: true },
+  { key: 'flat', name: 'Квартира', icon: '🏠', kind: 'period', on: true },
+  { key: 'fuel', name: 'АЗС', icon: '⛽', kind: 'period', on: false },
+  { key: 'haircut', name: 'Стрижка', icon: '💇', kind: 'period', on: false },
+  { key: 'rest', name: 'Отдых', icon: '✈️', kind: 'period', on: false },
   { key: 'pharmacy', name: 'Аптека', icon: '💊', kind: 'period', on: false },
-  { key: 'cafe', name: 'Кафе', icon: '☕', kind: 'period', on: false },
-  { key: 'savings', name: 'Накопления', icon: '🐷', kind: 'savings', on: true },
-];
+]
 
 export function Onboarding({ backend, user }) {
   const [mode, setMode] = useState(backend.mode === 'cloud' ? 'choose' : 'create');
@@ -23,7 +23,7 @@ export function Onboarding({ backend, user }) {
   const [busy, setBusy] = useState(false);
   const [payday, setPayday] = useState(10);
   const [currency, setCurrency] = useState('BYN');
-  const [items, setItems] = useState(TEMPLATES.map((t) => ({ ...t, amount: '' })));
+  const [items, setItems] = useState(TEMPLATES);
   const [income, setIncome] = useState('');
   const [spent, setSpent] = useState('');
   const [code, setCode] = useState('');
@@ -36,12 +36,10 @@ export function Onboarding({ backend, user }) {
   const cur = currencySymbol(currency);
 
   const chosen = items.filter((t) => t.on);
-  const amountOf = (t) => parseAmount(t.amount || '0');
-  const itemsInvalid = chosen.some((t) => Number.isNaN(amountOf(t)));
   const incomeKop = parseAmount(income || '0');
   const spentKop = parseAmount(spent || '0');
-  const mandatory = Object.fromEntries(chosen.map((t) => [t.key, amountOf(t) || 0]));
-  const totals = planPeriod({ income: incomeKop || 0, mandatory, days: period.days });
+  // Сразу после ввода дохода ничего не распределено: весь доход свободен
+  const totals = planPeriod({ income: incomeKop || 0, mandatory: {}, days: period.days });
   const perDayLeft = Math.floor(Math.max(0, totals.free - (spentKop || 0)) / daysLeft);
 
   const finish = async () => {
@@ -52,13 +50,12 @@ export function Onboarding({ backend, user }) {
     // Начали вести учёт посреди периода: уже потраченное записываем первой строкой, иначе лимит завышен
     if (midPeriod && spentKop > 0) envelopes[0].initialSpent = { amount: spentKop, date: period.start };
     chosen.forEach((t, i) => {
-      const kop = amountOf(t) || 0;
       envelopes.push({
         name: t.name,
         icon: t.icon,
         color: ENVELOPE_COLORS[(i + 1) % ENVELOPE_COLORS.length],
         kind: t.kind,
-        ...(t.kind === 'savings' ? { monthly: kop, goal: 0 } : { limit: kop }),
+        ...(t.kind === 'savings' ? { goal: 0 } : { limit: 0 }),
       });
     });
     try {
@@ -125,26 +122,21 @@ export function Onboarding({ backend, user }) {
       ${backend.mode === 'cloud' && html`<button class="link-btn" onClick=${() => setMode('choose')}>Назад</button>`}`}
 
     ${step === 2 &&
-    html`<h1 class="onb__title">Обязательные статьи</h1>
-      <p class="onb__text">Сколько каждый месяц уходит на обязательное. Эти суммы вычтутся из дохода, остальное разделится по дням. Всё можно поменять потом.</p>
+    html`<h1 class="onb__title">Категории расходов</h1>
+      <p class="onb__text">Отметьте, на что вы распределяете деньги после зарплаты. Суммы вы укажете потом на главном экране — каждый месяц заново или как в прошлом месяце.</p>
       <ul class="tpl-list">
         ${items.map(
           (t, i) => html`<li class=${`tpl ${t.on ? 'tpl--on' : ''}`}>
             <label class="tpl__check">
               <input type="checkbox" checked=${t.on} onChange=${(e) => setItems(items.map((x, j) => (j === i ? { ...x, on: e.target.checked } : x)))} />
               <span class="tpl__icon">${t.icon}</span>
-              <span>${t.name}${t.kind === 'savings' ? html`<small class="muted"> в месяц</small>` : ''}</span>
+              <span>${t.name}${t.kind === 'savings' ? html`<small class="muted"> копилка</small>` : ''}</span>
             </label>
-            ${t.on &&
-            html`<div class="input-money input-money--small">
-              <input class="input" inputmode="decimal" value=${t.amount} placeholder="0" aria-label=${`Сумма для «${t.name}»`} onInput=${(e) => setItems(items.map((x, j) => (j === i ? { ...x, amount: e.target.value } : x)))} />
-              <span>${cur}</span>
-            </div>`}
           </li>`,
         )}
       </ul>
-      <p class="onb__hint">Итого обязательных: ${formatMoney(totals.mandatoryTotal, currency)}</p>
-      <button class="btn btn--primary btn--block btn--lg" disabled=${itemsInvalid} onClick=${() => setStep(3)}>Дальше</button>
+      <p class="onb__hint">Свои категории можно добавить потом.</p>
+      <button class="btn btn--primary btn--block btn--lg" onClick=${() => setStep(3)}>Дальше</button>
       <button class="link-btn" onClick=${() => setStep(1)}>Назад</button>`}
 
     ${step === 3 &&
@@ -156,17 +148,11 @@ export function Onboarding({ backend, user }) {
       </div>
       ${incomeKop > 0 &&
       html`<div class=${`plan-result ${totals.free < 0 ? 'plan-result--bad' : ''}`}>
-        <div class="plan-result__row"><span>Доход</span><span>${formatMoney(incomeKop, currency)}</span></div>
-        <div class="plan-result__row"><span>Обязательные статьи</span><span>−${formatMoney(totals.mandatoryTotal, currency)}</span></div>
-        <div class="plan-result__row plan-result__row--total"><span>Свободно на покупки</span><span>${formatMoney(totals.free, currency)}</span></div>
-        ${totals.free < 0
-          ? html`<p class="plan-result__note">Обязательные статьи больше дохода. Вернитесь назад и уменьшите суммы.</p>`
-          : !midPeriod &&
-            html`<p class="plan-result__note">≈ <strong>${formatMoney(totals.perDay, currency)}</strong> в день на ${pluralDays(period.days)}</p>`}
+        <div class="plan-result__row plan-result__row--total"><span>Свободно до ${formatDay(period.end)}</span><span>${formatMoney(totals.free, currency)}</span></div>
+        ${!midPeriod && html`<p class="plan-result__note">≈ <strong>${formatMoney(totals.perDay, currency)}</strong> в день на ${pluralDays(period.days)}. После распределения по категориям сумма уменьшится.</p>`}
       </div>`}
       ${midPeriod &&
       incomeKop > 0 &&
-      totals.free >= 0 &&
       html`<label class="field">
           <span class="field__label">Сколько из свободных денег уже потрачено с ${formatDay(period.start)}?</span>
           <div class="input-money">
@@ -176,7 +162,7 @@ export function Onboarding({ backend, user }) {
         </label>
         <p class="onb__result">≈ <strong>${formatMoney(perDayLeft, currency)}</strong> в день на оставшиеся ${pluralDays(daysLeft)}</p>`}
       ${error && html`<p class="form-error">${error}</p>`}
-      <button class="btn btn--primary btn--block btn--lg" disabled=${busy || !(incomeKop > 0) || totals.free < 0 || Number.isNaN(spentKop)} onClick=${finish}>
+      <button class="btn btn--primary btn--block btn--lg" disabled=${busy || !(incomeKop > 0) || Number.isNaN(spentKop)} onClick=${finish}>
         ${busy ? 'Создаём…' : 'Готово'}
       </button>
       <button class="link-btn" onClick=${() => setStep(2)}>Назад</button>`}

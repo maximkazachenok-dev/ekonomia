@@ -110,7 +110,7 @@ export function SettingsScreen() {
 
     <section class="card card--flush">
       <div class="card__title-row card__pad">
-        <h2 class="card__title">Конверты</h2>
+        <h2 class="card__title">Категории</h2>
         <button class="link-btn" onClick=${() => openEnvelope({ kind: 'period' })}>+ Добавить</button>
       </div>
       <ul class="env-list">
@@ -123,10 +123,12 @@ export function SettingsScreen() {
                 <span class="env-row__sub muted">
                   ${KIND_LABELS[e.kind]} ·
                   ${e.kind === 'savings'
-                    ? html` в месяц <${Money} kop=${e.monthly || 0} />${e.goal ? html`, цель <${Money} kop=${e.goal} />` : ''}`
+                    ? html`${plan?.mandatory[e.id] ? html` распределено <${Money} kop=${plan.mandatory[e.id]} />` : ''}${e.goal ? html` цель <${Money} kop=${e.goal} />` : ''}`
                     : plan && e.id === plan.mainEnvelopeId
                       ? ' из дохода'
-                      : html` <${Money} kop=${envelopeLimit(e, plan)} />`}
+                      : plan
+                        ? html` распределено <${Money} kop=${envelopeLimit(e, plan)} />`
+                        : html` <${Money} kop=${envelopeLimit(e, plan)} />`}
                 </span>
               </span>
               <span class="env-row__chev">${Icon.chevron}</span>

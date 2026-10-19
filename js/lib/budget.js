@@ -155,23 +155,22 @@ export function savingsProgress({ balance = 0, goal = 0 }) {
   return { balance, goal, percent, left: Math.max(0, goal - balance) };
 }
 
-// ── Доход и обязательные статьи ──
-// План периода: { income, mandatory: {envelopeId: сумма}, free, mainEnvelopeId }.
-// free = доход − обязательные статьи; это сумма на период для главного конверта с дневным лимитом.
+// ── Доход и распределение по категориям ──
+// План периода: { income, mandatory: {envelopeId: сумма}, free, mainEnvelopeId, savingsTx? }.
+// В день зарплаты вводится доход — сначала он весь свободен. Затем деньги распределяются
+// по категориям (накопление, обслуживание авто, бьюти, квартира…); каждое распределение
+// уменьшает свободные деньги, а с ними и дневной лимит. Поле называется mandatory
+// (так оно хранится с версии 1.1.0), по смыслу это «распределено на категорию».
 
 // Главный конверт с дневным лимитом: из него тратятся свободные деньги.
 export function mainDailyEnvelope(envelopes) {
   return envelopes.find((e) => e.kind === 'daily' && !e.archived) || null;
 }
 
-// Обязательные статьи: конверты «до зарплаты», прочие дневные конверты и копилки (сколько откладываем в месяц).
+// Категории, на которые можно распределить доход: всё, кроме главного конверта и скрытых.
 export function mandatoryEnvelopes(envelopes) {
   const main = mainDailyEnvelope(envelopes);
   return envelopes.filter((e) => !e.archived && e !== main && ['period', 'daily', 'savings'].includes(e.kind));
-}
-
-export function mandatoryAmount(env) {
-  return env.kind === 'savings' ? env.monthly || 0 : env.limit || 0;
 }
 
 export function planPeriod({ income, mandatory, days }) {
@@ -180,34 +179,51 @@ export function planPeriod({ income, mandatory, days }) {
   return { mandatoryTotal, free, perDay: days > 0 ? Math.floor(Math.max(0, free) / days) : 0 };
 }
 
-// Новый план по доходу и текущим суммам конвертов (amounts переопределяет суммы, если заданы).
-export function buildPlan({ income, envelopes, amounts = {} }) {
-  const mandatory = {};
-  for (const e of mandatoryEnvelopes(envelopes)) mandatory[e.id] = amounts[e.id] ?? mandatoryAmount(e);
-  const { free } = planPeriod({ income, mandatory, days: 1 });
-  return { income, mandatory, free, mainEnvelopeId: mainDailyEnvelope(envelopes)?.id || null };
+const withFree = (plan) => ({ ...plan, free: planPeriod({ income: plan.income, mandatory: plan.mandatory, days: 1 }).free });
+
+// Доход только что внесён: ничего ещё не распределено, свободен весь доход.
+export function newPlan({ income, envelopes }) {
+  return { income, mandatory: {}, free: income, mainEnvelopeId: mainDailyEnvelope(envelopes)?.id || null };
 }
 
 // План, который создаётся вместе с семейным бюджетом на первом запуске.
 export function initialPlan(user, income, envelopes) {
-  return { ...buildPlan({ income, envelopes }), createdBy: { uid: user.uid, name: user.name }, createdAt: Date.now() };
+  return { ...newPlan({ income, envelopes }), createdBy: { uid: user.uid, name: user.name }, createdAt: Date.now() };
 }
 
-// Конверт изменили, добавили или скрыли посреди периода: поправить его сумму в плане и пересчитать свободное.
-export function applyEnvelopeToPlan(plan, env) {
-  if (!plan || env.id === plan.mainEnvelopeId) return plan;
+// Доход исправили посреди периода: распределение остаётся, меняются свободные деньги.
+export function withIncome(plan, income) {
+  return withFree({ ...plan, income });
+}
+
+// Распределить сумму на категорию (сумма задаётся целиком; 0 — убрать распределение).
+export function allocate(plan, envelopeId, amount) {
   const mandatory = { ...plan.mandatory };
-  if (env.archived || !['period', 'daily', 'savings'].includes(env.kind)) delete mandatory[env.id];
-  else mandatory[env.id] = mandatoryAmount(env);
-  const { free } = planPeriod({ income: plan.income, mandatory, days: 1 });
-  return { ...plan, mandatory, free };
+  if (amount > 0) mandatory[envelopeId] = amount;
+  else delete mandatory[envelopeId];
+  return withFree({ ...plan, mandatory });
+}
+
+// «Как в прошлом месяце»: суммы прошлого периода для категорий, которые ещё не распределены.
+export function allocationsFromPrevious(plan, prevPlan, envelopes) {
+  if (!prevPlan) return [];
+  return mandatoryEnvelopes(envelopes)
+    .filter((e) => prevPlan.mandatory?.[e.id] > 0 && !(e.id in plan.mandatory))
+    .map((e) => ({ envelope: e, amount: prevPlan.mandatory[e.id] }));
+}
+
+// Категорию скрыли посреди периода — её распределение возвращается в свободные деньги.
+export function applyEnvelopeToPlan(plan, env) {
+  if (!plan || !env.archived || !(env.id in plan.mandatory)) return plan;
+  return allocate(plan, env.id, 0);
 }
 
 // Сумма на период для конверта: из плана периода, а если дохода ещё нет — из настроек конверта.
+// С планом: главный конверт получает свободные деньги, категория — распределённую сумму (или 0).
 export function envelopeLimit(env, plan) {
   if (plan) {
     if (env.id === plan.mainEnvelopeId) return plan.free;
-    if (env.id in plan.mandatory) return plan.mandatory[env.id];
+    return plan.mandatory[env.id] || 0;
   }
   return env.limit || 0;
 }

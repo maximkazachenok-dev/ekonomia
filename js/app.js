@@ -4,6 +4,7 @@ import { TxSheet } from './ui/tx-sheet.js';
 import { EnvelopeSheet } from './ui/envelope-sheet.js';
 import { SummarySheet } from './ui/summary-sheet.js';
 import { IncomeSheet } from './ui/income-sheet.js';
+import { AllocateSheet } from './ui/allocate-sheet.js';
 import { PurchaseSheet } from './ui/purchase-sheet.js';
 import { ShopSheet } from './ui/shop-sheet.js';
 import { ShopsScreen } from './screens/shops.js';
@@ -14,8 +15,11 @@ import { SettingsScreen } from './screens/settings.js';
 import { Onboarding } from './screens/onboarding.js';
 import { LoginScreen } from './screens/login.js';
 import { createBackend, balanceChangesFor } from './data/store.js';
-import { getPeriod, previousPeriod, periodSummary, applyEnvelopeToPlan, mainDailyEnvelope, DEFAULT_SHOPS, shopName } from './lib/budget.js';
-import { todayISO } from './lib/dates.js';
+import {
+  getPeriod, previousPeriod, periodSummary, applyEnvelopeToPlan, mainDailyEnvelope, DEFAULT_SHOPS, shopName,
+  newPlan, withIncome, allocate, allocationsFromPrevious,
+} from './lib/budget.js';
+import { todayISO, formatDay } from './lib/dates.js';
 import { formatMoney } from './lib/money.js';
 
 // Дата «сегодня» обновляется при возврате в приложение и после полуночи.
@@ -55,6 +59,7 @@ function Budget({ backend, user, fid }) {
   const [envEdit, setEnvEdit] = useState(null);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [incomeOpen, setIncomeOpen] = useState(false);
+  const [allocEnv, setAllocEnv] = useState(null);
   const [extraPeriods, setExtraPeriods] = useState(0);
   const [periods, setPeriods] = useState(null);
   const [shops, setShops] = useState(null);
@@ -145,7 +150,66 @@ function Budget({ backend, user, fid }) {
       .savePeriod(fid, period.start, { ...newPlan, updatedBy: { uid: user.uid, name: user.name }, updatedAt: Date.now() }, envelopeUpdates)
       .catch((e) => showToast(e.message));
 
-  // Сумму статьи поменяли (или статью добавили/скрыли) посреди периода — пересчитать свободные деньги.
+  // Доход внесли или исправили. Новый период начинается с нуля: весь доход свободен.
+  const saveIncome = (income) => {
+    const next = plan ? withIncome(plan, income) : newPlan({ income, envelopes });
+    const main = mainDailyEnvelope(envelopes);
+    savePlan(next, main ? [{ id: main.id, limit: Math.max(0, next.free) }] : []);
+  };
+
+  // Распределение на копилку сразу пополняет её: один взнос на период, правка суммы правит его же.
+  const savingsDeposit = async (env, amount, currentTxId) => {
+    const existing = currentTxId && txs.find((t) => t.id === currentTxId);
+    if (amount > 0 && existing) {
+      updateTx(existing, { amount });
+      return existing.id;
+    }
+    if (amount > 0) {
+      const tx = {
+        envelopeId: env.id,
+        type: 'deposit',
+        amount,
+        note: `Распределение дохода ${formatDay(period.start, { short: true })} — ${formatDay(period.end, { short: true })}`,
+        date: today,
+        createdBy: { uid: user.uid, name: user.name },
+        createdAt: Date.now(),
+      };
+      return backend.addTransaction(fid, tx, balanceChangesFor(envById, null, tx));
+    }
+    if (existing) backend.deleteTransaction(fid, existing.id, balanceChangesFor(envById, existing, null));
+    return null;
+  };
+
+  // Распределить сумму на категорию (0 — убрать). Свободные деньги и дневной лимит уменьшаются сразу.
+  const allocateTo = async (env, amount) => {
+    let next = allocate(plan, env.id, amount);
+    if (env.kind === 'savings') {
+      const id = await savingsDeposit(env, amount, plan.savingsTx?.[env.id]).catch((e) => showToast(e.message));
+      const savingsTx = { ...(plan.savingsTx || {}) };
+      if (id) savingsTx[env.id] = id;
+      else delete savingsTx[env.id];
+      next = { ...next, savingsTx };
+    }
+    savePlan(next);
+  };
+
+  // «Как в прошлом месяце»: те же суммы на ещё не распределённые категории.
+  const repeatPrevious = async () => {
+    const list = allocationsFromPrevious(plan, prevPlan, envelopes);
+    let next = plan;
+    const savingsTx = { ...(plan.savingsTx || {}) };
+    for (const { envelope, amount } of list) {
+      next = allocate(next, envelope.id, amount);
+      if (envelope.kind === 'savings') {
+        const id = await savingsDeposit(envelope, amount, null).catch((e) => showToast(e.message));
+        if (id) savingsTx[envelope.id] = id;
+      }
+    }
+    savePlan({ ...next, savingsTx });
+    showToast(`Распределено как в прошлом месяце: ${formatMoney(list.reduce((s, a) => s + a.amount, 0), family.currency)}`);
+  };
+
+  // Категорию скрыли посреди периода — её распределение вернуть в свободные деньги.
   const saveEnvelope = async (env) => {
     const id = await backend.saveEnvelope(fid, env).catch((e) => showToast(e.message));
     if (plan && id) {
@@ -185,6 +249,10 @@ function Budget({ backend, user, fid }) {
     prevPlan,
     openIncome: () => setIncomeOpen(true),
     savePlan,
+    saveIncome,
+    allocateTo,
+    repeatPrevious,
+    openAllocate: setAllocEnv,
     addTx,
     updateTx,
     deleteTx,
@@ -219,6 +287,7 @@ function Budget({ backend, user, fid }) {
     <${EnvelopeSheet} env=${envEdit} onClose=${() => setEnvEdit(null)} />
     <${SummarySheet} open=${summaryOpen} onClose=${() => setSummaryOpen(false)} />
     <${IncomeSheet} open=${incomeOpen} onClose=${() => setIncomeOpen(false)} />
+    <${AllocateSheet} env=${allocEnv} onClose=${() => setAllocEnv(null)} />
     <${PurchaseSheet} opts=${purchaseOpts} onClose=${() => setPurchaseOpts(null)} />
     <${ShopSheet} shop=${shopEdit} onClose=${() => setShopEdit(null)} />
   <//>`;

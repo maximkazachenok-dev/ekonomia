@@ -1,6 +1,6 @@
 import { html } from '../lib/preact.js';
 import { useApp, Money, ProgressBar, Icon } from '../ui/common.js';
-import { dailyAllowance, envelopeProgress, savingsProgress, envelopeLimit } from '../lib/budget.js';
+import { dailyAllowance, envelopeProgress, savingsProgress, envelopeLimit, mandatoryEnvelopes, allocationsFromPrevious } from '../lib/budget.js';
 import { formatDay, pluralDays } from '../lib/dates.js';
 import { formatMoney } from '../lib/money.js';
 import { TxRow } from './history.js';
@@ -58,58 +58,63 @@ function DailyCard({ env, hero }) {
   </section>`;
 }
 
-// Строка распределения: доход − обязательные = свободно. Без дохода — приглашение его ввести.
-function PlanLine() {
-  const { plan, openIncome, period } = useApp();
+// Распределение дохода: доход − распределено = свободно, и категории с суммами.
+// Тап по категории — распределить или поправить сумму. Без дохода — приглашение его ввести.
+function AllocationCard() {
+  const { plan, prevPlan, envelopes, txs, period, family, openIncome, openAllocate, openEnvelope, repeatPrevious } = useApp();
   if (!plan) {
     return html`<button class="banner" onClick=${openIncome}>
       <span class="banner__icon">${Icon.plus}</span>
-      <span><strong>Новый период: введите доход</strong><br /><span class="muted">Приложение вычтет обязательные статьи и разделит остаток по дням до ${formatDay(period.end)}</span></span>
+      <span><strong>Новый период: введите доход</strong><br /><span class="muted">Сумма разделится по дням до ${formatDay(period.end)}, затем распределите её по категориям</span></span>
       <span class="banner__chev">${Icon.chevron}</span>
     </button>`;
   }
-  const mandatoryTotal = Object.values(plan.mandatory).reduce((s, v) => s + v, 0);
+  const cats = mandatoryEnvelopes(envelopes);
+  const allocated = Object.values(plan.mandatory).reduce((s, v) => s + v, 0);
+  const repeat = allocationsFromPrevious(plan, prevPlan, envelopes);
+  const cur = family.currency;
+
   return html`<section class="card">
     <div class="card__title-row">
       <h2 class="card__title">Распределение дохода</h2>
-      <button class="link-btn" onClick=${openIncome}>Изменить</button>
+      <button class="link-btn" onClick=${openIncome}>Доход: ${formatMoney(plan.income, cur)}</button>
     </div>
     <div class="plan-line">
       <span><${Money} kop=${plan.income} /> доход</span>
       <span class="muted">−</span>
-      <span><${Money} kop=${mandatoryTotal} /> обязательные</span>
+      <span><${Money} kop=${allocated} /> распределено</span>
       <span class="muted">=</span>
       <span class=${plan.free < 0 ? 'neg' : 'pos'}><${Money} kop=${plan.free} /> свободно</span>
     </div>
-  </section>`;
-}
 
-function PeriodEnvelopes({ envelopes }) {
-  const { txs, period, openTx, plan } = useApp();
-  if (!envelopes.length) return null;
-  return html`<section class="card">
-    <h2 class="card__title">Обязательные статьи</h2>
     <ul class="env-list">
-      ${envelopes.map((e) => {
-        const limit = envelopeLimit(e, plan);
-        const p = envelopeProgress({ limit, txs, envelopeId: e.id, period });
-        return html`<li>
-          <button class="env-row" onClick=${() => openTx({ envelopeId: e.id })} aria-label=${`Добавить трату в «${e.name}»`}>
+      ${cats.map((e) => {
+        const amount = plan.mandatory[e.id] || 0;
+        const p = e.kind !== 'savings' && amount > 0 ? envelopeProgress({ limit: amount, txs, envelopeId: e.id, period }) : null;
+        return html`<li key=${e.id}>
+          <button class="env-row" onClick=${() => openAllocate(e)} aria-label=${`Распределить на «${e.name}»`}>
             <span class="env-row__icon" style=${{ background: e.color + '22' }}>${e.icon}</span>
             <span class="env-row__main">
               <span class="env-row__top">
                 <span class="env-row__name">${e.name}</span>
-                <span class=${`env-row__left env-row__left--${p.status}`}>
-                  ${p.left < 0 ? html`перерасход <${Money} kop=${-p.left} />` : html`<${Money} kop=${p.left} />`}
-                </span>
+                ${amount > 0
+                  ? html`<span class=${`env-row__left ${p ? `env-row__left--${p.status}` : ''}`}><${Money} kop=${amount} /></span>`
+                  : html`<span class="alloc-cta">Распределить</span>`}
               </span>
-              <${ProgressBar} percent=${p.percent} status=${p.status} thin />
-              <span class="env-row__sub muted">потрачено <${Money} kop=${p.spent} /> из <${Money} kop=${limit} /></span>
+              ${p && html`<${ProgressBar} percent=${p.percent} status=${p.status} thin />
+                <span class="env-row__sub muted">${p.left < 0 ? html`перерасход <${Money} kop=${-p.left} />` : html`потрачено <${Money} kop=${p.spent} />, осталось <${Money} kop=${p.left} />`}</span>`}
+              ${e.kind === 'savings' && amount > 0 && html`<span class="env-row__sub muted">отложено в копилку</span>`}
             </span>
           </button>
         </li>`;
       })}
     </ul>
+
+    ${repeat.length > 0 &&
+    html`<button class="btn btn--ghost btn--block" onClick=${repeatPrevious}>
+      Как в прошлом месяце: ${formatMoney(repeat.reduce((s, a) => s + a.amount, 0), cur)}
+    </button>`}
+    <button class="link-btn" onClick=${() => openEnvelope({ kind: 'period' })}>+ Новая категория</button>
   </section>`;
 }
 
@@ -141,10 +146,11 @@ function SavingsCard({ envelopes }) {
 }
 
 export function HomeScreen() {
-  const { envelopes, txs, period, family, summaryPending, openSummary, setTab, envById } = useApp();
+  const { envelopes, txs, period, family, summaryPending, openSummary, setTab, envById, plan } = useApp();
   const active = envelopes.filter((e) => !e.archived);
   const daily = active.filter((e) => e.kind === 'daily');
-  const periodEnvs = active.filter((e) => e.kind === 'period');
+  // Пока доход не введён или ещё ничего не распределено — блок распределения выше голосового ввода
+  const allocFirst = !plan || Object.keys(plan.mandatory).length === 0;
   const savings = active.filter((e) => e.kind === 'savings');
   const recent = txs.filter((t) => envById[t.envelopeId]).slice(0, 5);
 
@@ -164,9 +170,9 @@ export function HomeScreen() {
     </button>`}
 
     ${daily.map((e, i) => html`<${DailyCard} key=${e.id} env=${e} hero=${i === 0} />`)}
+    ${allocFirst && html`<${AllocationCard} />`}
     ${daily.length > 0 && html`<${VoiceCard} />`}
-    <${PlanLine} />
-    <${PeriodEnvelopes} envelopes=${periodEnvs} />
+    ${!allocFirst && html`<${AllocationCard} />`}
     <${SavingsCard} envelopes=${savings} />
 
     ${recent.length > 0 &&

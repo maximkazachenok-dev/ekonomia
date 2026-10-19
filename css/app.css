@@ -398,6 +398,7 @@ label.btn { cursor: pointer; }
 .plan-result--bad { background: var(--over-soft); }
 .plan-result__row { display: flex; justify-content: space-between; gap: 8px; font-variant-numeric: tabular-nums; }
 .plan-result__row--total { font-weight: 700; font-size: 18px; padding-top: 6px; border-top: 1px solid var(--line); }
+.plan-result__row--total:first-child { padding-top: 0; border-top: 0; }
 .plan-result__note { font-size: 14px; color: var(--muted); }
 .plan-result__note strong { color: var(--ok); }
 .plan-result--bad .plan-result__note { color: var(--over); }
@@ -541,3 +542,6 @@ label.btn { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* ── Распределение дохода ──────────────────────────── */
+.alloc-cta { color: var(--primary); font-weight: 600; font-size: 14px; }

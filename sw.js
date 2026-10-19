@@ -1,7 +1,7 @@
 // Service worker: приложение открывается сразу из памяти телефона, в том числе без интернета.
 // При ЛЮБОМ изменении файлов приложения увеличьте VERSION: браузер увидит новый sw.js,
 // в фоне скачает свежие файлы, и со следующего открытия заработает новая версия.
-const VERSION = 'v1.3.1';
+const VERSION = 'v1.4.0';
 const SHELL = `shell-${VERSION}`;
 const CDN = 'cdn-v1';
 
@@ -28,6 +28,7 @@ const SHELL_FILES = [
   'js/ui/envelope-sheet.js',
   'js/ui/summary-sheet.js',
   'js/ui/income-sheet.js',
+  'js/ui/allocate-sheet.js',
   'js/ui/purchase-sheet.js',
   'js/ui/shop-sheet.js',
   'js/ui/voice-card.js',
