@@ -1,6 +1,6 @@
 import { html } from '../lib/preact.js';
 import { useApp, Money, ProgressBar, Icon } from '../ui/common.js';
-import { dailyAllowance, envelopeProgress, savingsProgress, envelopeLimit, mandatoryEnvelopes, allocationsFromPrevious } from '../lib/budget.js';
+import { dailyAllowance, envelopeProgress, savingsProgress, envelopeLimit, mandatoryEnvelopes, allocationsFromPrevious, periodStats } from '../lib/budget.js';
 import { formatDay, pluralDays } from '../lib/dates.js';
 import { formatMoney } from '../lib/money.js';
 import { TxRow } from './history.js';
@@ -145,6 +145,23 @@ function SavingsCard({ envelopes }) {
   </section>`;
 }
 
+// Вход в статистику; подпись — итог прошлого месяца, если в нём был введён доход.
+function StatsBanner() {
+  const { envelopes, txs, prevPeriod, prevPlan, openStats } = useApp();
+  const prev = prevPlan ? periodStats({ envelopes, txs, period: prevPeriod, plan: prevPlan }) : null;
+  return html`<button class="banner" onClick=${openStats}>
+    <span class="banner__icon">${Icon.chart}</span>
+    <span><strong>Статистика по месяцам</strong><br /><span class="muted">
+      ${prev && prev.totalSpent > 0
+        ? prev.left >= 0
+          ? html`В прошлом месяце сэкономлено <${Money} kop=${prev.left} />`
+          : html`В прошлом месяце перерасход <${Money} kop=${-prev.left} />`
+        : 'Сколько тратите и сколько удаётся сэкономить'}
+    </span></span>
+    <span class="banner__chev">${Icon.chevron}</span>
+  </button>`;
+}
+
 export function HomeScreen() {
   const { envelopes, txs, period, family, summaryPending, openSummary, setTab, envById, plan } = useApp();
   const active = envelopes.filter((e) => !e.archived);
@@ -174,6 +191,7 @@ export function HomeScreen() {
     ${daily.length > 0 && html`<${VoiceCard} />`}
     ${!allocFirst && html`<${AllocationCard} />`}
     <${SavingsCard} envelopes=${savings} />
+    <${StatsBanner} />
 
     ${recent.length > 0 &&
     html`<section class="card">

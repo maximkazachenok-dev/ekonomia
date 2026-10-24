@@ -104,6 +104,7 @@ export const Icon = {
   share: svg('<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13"/>'),
   cloudOff: svg('<path d="m2 2 20 20M5.8 7.8A6 6 0 0 0 7 19h11M17.5 10A4.5 4.5 0 0 1 21.7 17M9.5 5.4A6 6 0 0 1 17.6 10"/>'),
   check: svg('<path d="M20 6 9 17l-5-5"/>'),
+  chart: svg('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'),
   trophy: svg('<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>'),
 };
 

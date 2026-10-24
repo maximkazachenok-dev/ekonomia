@@ -3,6 +3,7 @@ import { AppContext, Toasts, showToast, Icon } from './ui/common.js';
 import { TxSheet } from './ui/tx-sheet.js';
 import { EnvelopeSheet } from './ui/envelope-sheet.js';
 import { SummarySheet } from './ui/summary-sheet.js';
+import { StatsSheet } from './ui/stats-sheet.js';
 import { IncomeSheet } from './ui/income-sheet.js';
 import { AllocateSheet } from './ui/allocate-sheet.js';
 import { PurchaseSheet } from './ui/purchase-sheet.js';
@@ -58,6 +59,7 @@ function Budget({ backend, user, fid }) {
   const [txOpts, setTxOpts] = useState(null);
   const [envEdit, setEnvEdit] = useState(null);
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const [statsOpen, setStatsOpen] = useState(false);
   const [incomeOpen, setIncomeOpen] = useState(false);
   const [allocEnv, setAllocEnv] = useState(null);
   const [extraPeriods, setExtraPeriods] = useState(0);
@@ -244,6 +246,8 @@ function Budget({ backend, user, fid }) {
     openShopEdit: setShopEdit,
     saveShop: (shop) => backend.saveShop(fid, shop).catch((e) => showToast(e.message)),
     openSummary: () => setSummaryOpen(true),
+    openStats: () => setStatsOpen(true),
+    periods,
     summaryPending,
     plan,
     prevPlan,
@@ -286,6 +290,7 @@ function Budget({ backend, user, fid }) {
     <${TxSheet} opts=${txOpts} onClose=${() => setTxOpts(null)} />
     <${EnvelopeSheet} env=${envEdit} onClose=${() => setEnvEdit(null)} />
     <${SummarySheet} open=${summaryOpen} onClose=${() => setSummaryOpen(false)} />
+    <${StatsSheet} open=${statsOpen} onClose=${() => setStatsOpen(false)} />
     <${IncomeSheet} open=${incomeOpen} onClose=${() => setIncomeOpen(false)} />
     <${AllocateSheet} env=${allocEnv} onClose=${() => setAllocEnv(null)} />
     <${PurchaseSheet} opts=${purchaseOpts} onClose=${() => setPurchaseOpts(null)} />

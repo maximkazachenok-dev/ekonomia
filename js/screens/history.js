@@ -37,7 +37,7 @@ export function TxRow({ tx, showDate = false }) {
 }
 
 export function HistoryScreen() {
-  const { txs, envelopes, envById, shops, today, family, user, since, loadEarlier } = useApp();
+  const { txs, envelopes, envById, shops, today, family, user, since, loadEarlier, openStats } = useApp();
   // Фильтр: 'all', id конверта или 'shop:<id>' для раздела покупок
   const [envFilter, setEnvFilter] = useState('all');
   const [who, setWho] = useState('all');
@@ -64,7 +64,10 @@ export function HistoryScreen() {
   const used = envelopes.filter((e) => !e.archived || txs.some((t) => t.envelopeId === e.id));
 
   return html`<div class="screen">
-    <header class="screen__head"><h1 class="screen__title">История</h1></header>
+    <header class="screen__head">
+      <h1 class="screen__title">История</h1>
+      <button class="link-btn" onClick=${openStats}>Статистика</button>
+    </header>
 
     <div class="chips chips--scroll">
       <button class=${`chip chip--small ${envFilter === 'all' ? 'chip--active' : ''}`} onClick=${() => setEnvFilter('all')}>Все</button>

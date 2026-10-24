@@ -3,6 +3,7 @@ import {
   getPeriod, previousPeriod, dailyAllowance, envelopeProgress, periodSummary, sumExpenses,
   mainDailyEnvelope, mandatoryEnvelopes, planPeriod, newPlan, withIncome, allocate, allocationsFromPrevious, applyEnvelopeToPlan, envelopeLimit,
   itemsTotal, shopTotals, itemSuggestions, lastPrice, shopName, priceChange, priceList,
+  periodsSince, periodStats, statsTotals,
 } from '../js/lib/budget.js';
 import { parseAmount, formatAmount, toInputString } from '../js/lib/money.js';
 import { pluralDays, addDays, daysBetween } from '../js/lib/dates.js';
@@ -215,6 +216,37 @@ eq(shopName({ defaultName: 'Другое' }), 'Другое', 'имя разде
 eq(shopName({ name: 'Мелочи', defaultName: 'Другое' }), 'Мелочи', 'переименованный раздел');
 // Покупки идут в главный дневной конверт — дневной лимит считает их как обычные траты
 eq(dailyAllowance({ limit: 110000, txs: purchases, envelopeId: 'shop', today: '2026-10-15', period }).spentTotal, 2490, 'покупки в разделах вычитаются из дневного лимита');
+
+// ── Статистика по месяцам ──
+const cur = getPeriod('2026-10-24', 10);
+eq(periodsSince('2026-08-15', cur, 10).map((p) => p.start), ['2026-10-10', '2026-09-10', '2026-08-10'], 'статистика: периоды от первой траты до текущего');
+eq(periodsSince('2026-10-12', cur, 10).map((p) => p.start), ['2026-10-10'], 'статистика: всё в текущем периоде — один период');
+eq(periodsSince('2020-01-01', cur, 10, 3).length, 3, 'статистика: не больше заданного числа периодов');
+const sEnvs = [
+  { id: 'shop', kind: 'daily', name: 'Покупки' },
+  { id: 'beauty', kind: 'period', name: 'Бьюти' },
+  { id: 'old', kind: 'period', name: 'Старое', archived: true },
+  { id: 'piggy', kind: 'savings', name: 'Копилка' },
+];
+const sTxs = [
+  tx('2026-10-15', 5000), tx('2026-10-11', 3000, 'beauty'),
+  tx('2026-09-20', 80000), tx('2026-09-12', 15000, 'beauty'), tx('2026-09-11', 2000, 'old'),
+  tx('2026-09-11', 50000, 'piggy', 'deposit'),
+  tx('2026-08-20', 70000),
+];
+const sepPlan = { income: 150000, mandatory: { beauty: 10000, piggy: 50000 }, free: 90000, mainEnvelopeId: 'shop' };
+const sep = periodStats({ envelopes: sEnvs, txs: sTxs, period: getPeriod('2026-09-20', 10), plan: sepPlan });
+eq(sep.rows.map((r) => [r.envelope.id, r.spent, r.limit]), [['shop', 80000, 90000], ['beauty', 15000, 10000], ['old', 2000, 0]], 'статистика периода: категории по убыванию трат, скрытая с тратами тоже, копилка нет');
+eq([sep.totalSpent, sep.totalLimit, sep.left], [97000, 100000, 3000], 'статистика периода: потрачено 970 из 1000, осталось 30');
+const aug = periodStats({ envelopes: sEnvs, txs: sTxs, period: getPeriod('2026-08-20', 10) });
+eq([aug.totalSpent, aug.totalLimit, aug.left], [70000, null, null], 'период без дохода: только траты, без плана и экономии');
+const octPlan = { income: 150000, mandatory: { beauty: 10000 }, free: 140000, mainEnvelopeId: 'shop' };
+const oct = periodStats({ envelopes: sEnvs, txs: sTxs, period: cur, plan: octPlan });
+eq(statsTotals([oct, sep, aug], '2026-10-24'), { saved: 3000, plannedCount: 1, avgSpent: 83500, since: '2026-09-10' },
+  'итог: экономия только за закрытые периоды с доходом, текущий не считается; средние траты по закрытым');
+eq(statsTotals([oct], '2026-10-24'), { saved: 0, plannedCount: 0, avgSpent: 0, since: null }, 'итог: закрытых периодов ещё нет');
+const overPlan = { ...sepPlan, free: 50000 };
+eq(periodStats({ envelopes: sEnvs, txs: sTxs, period: getPeriod('2026-09-20', 10), plan: overPlan }).left, -37000, 'перерасход периода — с минусом');
 
 out(`\n${failed ? '✗' : '✓'} Пройдено: ${passed}, упало: ${failed}`);
 if (typeof globalThis.__testResult === 'function') globalThis.__testResult(passed, failed);

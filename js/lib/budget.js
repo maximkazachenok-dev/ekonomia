@@ -267,3 +267,46 @@ export function periodSummary({ envelopes, txs, period, plan = null }) {
   const totalSaved = rows.reduce((s, r) => s + Math.max(0, r.saved), 0);
   return { rows, totalLimit, totalSpent, totalSaved };
 }
+
+// ── Статистика по месяцам ──
+
+// Периоды от того, в который попадает first, до текущего — от новых к старым, не больше max.
+export function periodsSince(first, current, payday, max = 24) {
+  const list = [current];
+  let p = current;
+  while (list.length < max && first < p.start) {
+    p = previousPeriod(p, payday);
+    list.push(p);
+  }
+  return list;
+}
+
+// Траты периода по категориям (и скрытым, если в них тратили) и план, если доход был введён.
+// left — сколько осталось от запланированного (минус — перерасход); без плана null.
+export function periodStats({ envelopes, txs, period, plan = null }) {
+  const rows = envelopes
+    .filter((e) => e.kind !== 'savings')
+    .map((e) => ({
+      envelope: e,
+      limit: plan ? envelopeLimit(e, plan) : null,
+      spent: sumExpenses(txs, e.id, period.start, period.end),
+    }))
+    .filter((r) => r.spent > 0 || r.limit > 0)
+    .sort((a, b) => b.spent - a.spent);
+  const totalSpent = rows.reduce((s, r) => s + r.spent, 0);
+  const totalLimit = plan ? rows.reduce((s, r) => s + r.limit, 0) : null;
+  return { period, plan, rows, totalSpent, totalLimit, left: plan ? totalLimit - totalSpent : null };
+}
+
+// Итог по закрытым периодам: сколько сэкономлено (только периоды с планом) и средние траты.
+export function statsTotals(stats, today) {
+  const closed = stats.filter((s) => s.period.end <= today);
+  const planned = closed.filter((s) => s.plan);
+  const spentPeriods = closed.filter((s) => s.totalSpent > 0);
+  return {
+    saved: planned.reduce((s, x) => s + x.left, 0),
+    plannedCount: planned.length,
+    avgSpent: spentPeriods.length ? Math.round(spentPeriods.reduce((s, x) => s + x.totalSpent, 0) / spentPeriods.length) : 0,
+    since: planned.length ? planned[planned.length - 1].period.start : null,
+  };
+}
