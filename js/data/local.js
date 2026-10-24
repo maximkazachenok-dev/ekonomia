@@ -120,6 +120,15 @@ export const localBackend = {
     save();
   },
 
+  async deletePeriod(fid, start, envelopeUpdates = []) {
+    const { [start]: _, ...rest } = db.periods || {};
+    db.periods = rest;
+    for (const { id, ...patch } of envelopeUpdates) {
+      if (db.envelopes[id]) db.envelopes[id] = { ...db.envelopes[id], ...patch };
+    }
+    save();
+  },
+
   async joinFamily() {
     throw new Error('Вступить в семью можно только после подключения Firebase (см. README.md).');
   },

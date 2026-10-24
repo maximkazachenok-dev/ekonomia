@@ -1,18 +1,14 @@
 // Service worker: приложение открывается сразу из памяти телефона, в том числе без интернета.
 // При ЛЮБОМ изменении файлов приложения увеличьте VERSION: браузер увидит новый sw.js,
 // в фоне скачает свежие файлы, и со следующего открытия заработает новая версия.
-const VERSION = 'v1.6.1';
+const VERSION = 'v1.6.2';
 const SHELL = `shell-${VERSION}`;
 const CDN = 'cdn-v1';
 
 const SHELL_FILES = [
   './',
   'index.html',
-  'manifest.webmanifest',
   'css/app.css',
-  'icons/favicon-64.png',
-  'icons/icon-192.png',
-  'icons/home-icon-180.png',
   'js/app.js',
   'js/config.js',
   'js/lib/preact.js',
@@ -86,6 +82,8 @@ self.addEventListener('fetch', (e) => {
   }
 
   if (url.origin !== location.origin) return; // Firestore, Auth и пр. — напрямую
+  // Иконки и манифест — всегда с сервера: их забирает сам iPhone при добавлении на экран «Домой»
+  if (/\/icons\/|\.webmanifest$|apple-touch-icon/.test(url.pathname)) return;
 
   // Свои файлы: сначала память телефона — запуск мгновенный и не зависит от связи.
   // Свежие версии приходят вместе с новым sw.js (см. VERSION).

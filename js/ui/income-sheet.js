@@ -7,7 +7,7 @@ import { planPeriod, mainDailyEnvelope, dailyAllowance } from '../lib/budget.js'
 import { formatDay, pluralDays } from '../lib/dates.js';
 
 export function IncomeSheet({ open, onClose }) {
-  const { envelopes, plan, prevPlan, period, family, today, txs, saveIncome } = useApp();
+  const { envelopes, plan, prevPlan, period, family, today, txs, saveIncome, deleteIncome } = useApp();
   const main = mainDailyEnvelope(envelopes);
   const [income, setIncome] = useState('');
 
@@ -30,6 +30,14 @@ export function IncomeSheet({ open, onClose }) {
     e.preventDefault();
     if (!valid) return;
     saveIncome(kop);
+    onClose();
+  };
+
+  const remove = () => {
+    const deposits = Object.keys(plan.savingsTx || {}).length;
+    const text = `Удалить доход ${formatMoney(plan.income, family.currency)} за ${formatDay(period.start, { short: true })} — ${formatDay(period.end, { short: true })}?\n\nРаспределение по категориям тоже удалится${deposits ? ', а взносы в копилки из него будут забраны обратно' : ''}. Траты останутся.`;
+    if (!confirm(text)) return;
+    deleteIncome();
     onClose();
   };
 
@@ -64,6 +72,7 @@ export function IncomeSheet({ open, onClose }) {
       ${!plan && html`<p class="field__hint">Дальше распределите деньги по категориям на главном экране — свободная сумма и дневной лимит будут уменьшаться.</p>`}
 
       <button type="submit" class="btn btn--primary btn--block btn--lg" disabled=${!valid}>Сохранить</button>
+      ${plan && html`<button type="button" class="btn btn--danger-ghost btn--block" onClick=${remove}>Удалить доход</button>`}
     </form>
   <//>`;
 }

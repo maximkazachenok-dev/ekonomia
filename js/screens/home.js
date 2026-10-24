@@ -174,7 +174,8 @@ function StatsBanner() {
 export function HomeScreen() {
   const { envelopes, txs, period, family, summaryPending, openSummary, setTab, envById, plan } = useApp();
   const active = envelopes.filter((e) => !e.archived);
-  const daily = active.filter((e) => e.kind === 'daily');
+  const hasDaily = active.some((e) => e.kind === 'daily');
+  const daily = active.filter((e) => e.kind === 'daily' && (plan || e.limit > 0));
   // Пока доход не введён или ещё ничего не распределено — блок распределения выше голосового ввода
   const allocFirst = !plan || Object.keys(plan.mandatory).length === 0;
   const savings = active.filter((e) => e.kind === 'savings');
@@ -197,7 +198,7 @@ export function HomeScreen() {
 
     ${daily.map((e, i) => html`<${DailyCard} key=${e.id} env=${e} hero=${i === 0} />`)}
     ${allocFirst && html`<${AllocationCard} />`}
-    ${daily.length > 0 && html`<${VoiceCard} />`}
+    ${hasDaily && html`<${VoiceCard} />`}
     ${!allocFirst && html`<${AllocationCard} />`}
     <${SavingsCard} envelopes=${savings} />
     <${StatsBanner} />

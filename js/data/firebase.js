@@ -268,6 +268,13 @@ export function createFirebaseBackend(config) {
       commit(batch);
     },
 
+    async deletePeriod(fid, start, envelopeUpdates = []) {
+      const batch = writeBatch(db);
+      batch.delete(fam(fid, 'periods', start));
+      for (const { id, ...patch } of envelopeUpdates) batch.update(fam(fid, 'envelopes', id), patch);
+      commit(batch);
+    },
+
     async fetchAllTransactions(fid) {
       const s = await getDocs(query(famCol(fid, 'transactions'), orderBy('date', 'desc')));
       return s.docs.map((d) => ({ id: d.id, ...d.data() }));

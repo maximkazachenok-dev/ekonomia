@@ -159,6 +159,18 @@ function Budget({ backend, user, fid }) {
     savePlan(next, main ? [{ id: main.id, limit: Math.max(0, next.free) }] : []);
   };
 
+  // Доход внесли по ошибке: удаляем план периода вместе с распределением.
+  // Взносы в копилки из этого распределения тоже убираем, сумма главного конверта обнуляется.
+  const deleteIncome = async () => {
+    for (const id of Object.values(plan?.savingsTx || {})) {
+      const tx = txs.find((t) => t.id === id);
+      if (tx) await backend.deleteTransaction(fid, tx.id, balanceChangesFor(envById, tx, null)).catch((e) => showToast(e.message));
+    }
+    const main = mainDailyEnvelope(envelopes);
+    await backend.deletePeriod(fid, period.start, main ? [{ id: main.id, limit: 0 }] : []).catch((e) => showToast(e.message));
+    showToast('Доход за период удалён');
+  };
+
   // Распределение на копилку сразу пополняет её: один взнос на период, правка суммы правит его же.
   const savingsDeposit = async (env, amount, currentTxId) => {
     const existing = currentTxId && txs.find((t) => t.id === currentTxId);
@@ -254,6 +266,7 @@ function Budget({ backend, user, fid }) {
     openIncome: () => setIncomeOpen(true),
     savePlan,
     saveIncome,
+    deleteIncome,
     allocateTo,
     repeatPrevious,
     openAllocate: setAllocEnv,

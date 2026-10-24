@@ -45,8 +45,8 @@ def maskable(inner_img, n=1024, art_share=0.84):
     return bg
 
 
-save(inner, "icon-192.png", 192)
-save(inner, "icon-512.png", 512)
-save(maskable(inner), "icon-maskable-512.png", 512)
-save(inner, "home-icon-180.png", 180)
+save(inner, "app-192.png", 192)
+save(inner, "app-512.png", 512)
+save(maskable(inner), "app-maskable-512.png", 512)
+save(inner, "app-180.png", 180)
 save(inner, "favicon-64.png", 64)

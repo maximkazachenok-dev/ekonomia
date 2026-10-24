@@ -131,7 +131,7 @@ python3 tools/serve.py
 Сборка не нужна: это обычные ES-модули. Preact и Firebase загружаются с CDN, service worker кэширует их для работы офлайн.
 
 ```
-index.html, manifest.webmanifest, sw.js   — оболочка PWA
+index.html, app.webmanifest, sw.js        — оболочка PWA
 css/app.css                                — стили (светлая и тёмная тема)
 js/app.js                                  — точка входа, состояние, вкладки
 js/config.js                               — ключи Firebase (null = локальный режим)

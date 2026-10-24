@@ -171,6 +171,6 @@ export function SettingsScreen() {
       <button class="btn btn--danger-ghost btn--block" onClick=${() => backend.signOut()}>Выйти</button>
     </section>`}
 
-    <p class="footnote">Экономия денег · v1.6.1</p>
+    <p class="footnote">Экономия денег · v1.6.2</p>
   </div>`;
 }
