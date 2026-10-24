@@ -4,7 +4,7 @@ import { BottomSheet, useApp, ENVELOPE_ICONS, ENVELOPE_COLORS, KIND_LABELS, show
 import { parseAmount, toInputString, currencySymbol, formatMoney } from '../lib/money.js';
 
 export function EnvelopeSheet({ env, onClose }) {
-  const { envelopes, saveEnvelope, family, period, plan } = useApp();
+  const { envelopes, saveEnvelope, family, period, plan, openAllocate } = useApp();
   const isNew = !env?.id;
   const [name, setName] = useState('');
   const [icon, setIcon] = useState('🛒');
@@ -33,7 +33,7 @@ export function EnvelopeSheet({ env, onClose }) {
   const byAllocation = plan && !fromIncome && kind !== 'savings';
   const allocatedNow = (plan && env.id && plan.mandatory[env.id]) || 0;
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault();
     if (!valid) return;
     const data = { name: name.trim(), icon, color, kind };
@@ -41,8 +41,10 @@ export function EnvelopeSheet({ env, onClose }) {
     else if (!fromIncome && !byAllocation) data.limit = kop;
     if (isNew) data.order = envelopes.length;
     else data.id = env.id;
-    saveEnvelope(data);
     onClose();
+    const id = await saveEnvelope(data);
+    // Доход уже введён: новую категорию сразу предлагаем распределить
+    if (isNew && plan && id) openAllocate({ ...data, id });
   };
 
   const archive = () => {

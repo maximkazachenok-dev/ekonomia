@@ -338,4 +338,20 @@ render(html`<${App} />`, document.getElementById('root'));
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('SW', e));
+
+  // Приложение с экрана «Домой» возвращается из фона без перезагрузки, и браузер сам не проверяет
+  // обновления. Проверяем при каждом возврате; новая версия включается перезапуском.
+  const hadController = Boolean(navigator.serviceWorker.controller);
+  let updateReady = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || updateReady) return; // первая установка — обновлять нечего
+    updateReady = true;
+    if (document.visibilityState === 'hidden') location.reload();
+    else showToast('Вышла новая версия приложения', { label: 'Обновить', run: () => location.reload() });
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    if (updateReady) location.reload();
+    else navigator.serviceWorker.getRegistration().then((r) => r?.update()).catch(() => {});
+  });
 }

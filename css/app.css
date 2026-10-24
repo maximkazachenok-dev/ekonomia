@@ -167,6 +167,8 @@ svg { flex-shrink: 0; }
 .env-row__left--warn { color: var(--warn); }
 .env-row__left--over { color: var(--over); }
 .env-row__sub { font-size: 13px; }
+.env-row__sub--warn { color: var(--warn); }
+.alloc-fix { margin: 2px 0 8px; }
 .env-row__chev { color: var(--muted); }
 
 .tx-row__main { flex: 1; min-width: 0; display: flex; flex-direction: column; }

@@ -61,7 +61,7 @@ function DailyCard({ env, hero }) {
 // Распределение дохода: доход − распределено = свободно, и категории с суммами.
 // Тап по категории — распределить или поправить сумму. Без дохода — приглашение его ввести.
 function AllocationCard() {
-  const { plan, prevPlan, envelopes, txs, period, family, openIncome, openAllocate, openEnvelope, repeatPrevious } = useApp();
+  const { plan, prevPlan, envelopes, txs, period, family, openIncome, openAllocate, openEnvelope, repeatPrevious, allocateTo } = useApp();
   if (!plan) {
     return html`<button class="banner" onClick=${openIncome}>
       <span class="banner__icon">${Icon.plus}</span>
@@ -91,6 +91,8 @@ function AllocationCard() {
       ${cats.map((e) => {
         const amount = plan.mandatory[e.id] || 0;
         const p = e.kind !== 'savings' && amount > 0 ? envelopeProgress({ limit: amount, txs, envelopeId: e.id, period }) : null;
+        // До версии 1.4 распределение на копилку только резервировало деньги, взнос в копилку не создавался
+        const notDeposited = e.kind === 'savings' && amount > 0 && !plan.savingsTx?.[e.id];
         return html`<li key=${e.id}>
           <button class="env-row" onClick=${() => openAllocate(e)} aria-label=${`Распределить на «${e.name}»`}>
             <span class="env-row__icon" style=${{ background: e.color + '22' }}>${e.icon}</span>
@@ -103,9 +105,16 @@ function AllocationCard() {
               </span>
               ${p && html`<${ProgressBar} percent=${p.percent} status=${p.status} thin />
                 <span class="env-row__sub muted">${p.left < 0 ? html`перерасход <${Money} kop=${-p.left} />` : html`потрачено <${Money} kop=${p.spent} />, осталось <${Money} kop=${p.left} />`}</span>`}
-              ${e.kind === 'savings' && amount > 0 && html`<span class="env-row__sub muted">отложено в копилку</span>`}
+              ${e.kind === 'savings' && amount > 0 &&
+              (notDeposited
+                ? html`<span class="env-row__sub env-row__sub--warn">в копилку пока не попало</span>`
+                : html`<span class="env-row__sub muted">отложено в копилку</span>`)}
             </span>
           </button>
+          ${notDeposited &&
+          html`<button class="btn btn--primary btn--block alloc-fix" onClick=${() => allocateTo(e, amount)}>
+            Положить ${formatMoney(amount, cur)} в копилку «${e.name}»
+          </button>`}
         </li>`;
       })}
     </ul>

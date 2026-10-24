@@ -48,5 +48,5 @@ def maskable(inner_img, n=1024, art_share=0.84):
 save(inner, "icon-192.png", 192)
 save(inner, "icon-512.png", 512)
 save(maskable(inner), "icon-maskable-512.png", 512)
-save(inner, "apple-touch-icon.png", 180)
+save(inner, "home-icon-180.png", 180)
 save(inner, "favicon-64.png", 64)
