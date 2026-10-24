@@ -1,7 +1,7 @@
 // Вкладка «Магазины»: разделы покупок (магазины и категории) и покупки в них.
 import { html, useState, useMemo } from '../lib/preact.js';
 import { useApp, Money, Icon } from '../ui/common.js';
-import { shopName, shopTotals } from '../lib/budget.js';
+import { shopName, shopTotals, priceList } from '../lib/budget.js';
 import { relativeDay, formatDay } from '../lib/dates.js';
 
 const pluralPurchases = (n) => {
@@ -12,6 +12,51 @@ const pluralPurchases = (n) => {
   if (b >= 2 && b <= 4) return `${n} покупки`;
   return `${n} покупок`;
 };
+
+// «Цены на товары»: что подорожало с прошлой покупки; по нажатию — история цен товара.
+function PriceCard() {
+  const { txs, shopById, since } = useApp();
+  const [openName, setOpenName] = useState(null);
+  const [showAll, setShowAll] = useState(false);
+  const prices = useMemo(() => priceList(txs), [txs]);
+  if (!prices.length) return null;
+  const visible = showAll ? prices : prices.slice(0, 8);
+
+  return html`<section class="card card--flush">
+    <div class="card__pad">
+      <h2 class="card__title">Цены на товары</h2>
+      <p class="env-row__sub muted">Как изменилась цена с прошлой покупки. Покупки с ${formatDay(since, { short: true })}</p>
+    </div>
+    <ul class="env-list">
+      ${visible.map((p) => {
+        const open = openName === p.name;
+        const last = p.history[0].amount;
+        return html`<li key=${p.name}>
+          <button class="price-row" onClick=${() => setOpenName(open ? null : p.name)} aria-expanded=${open}>
+            <span class="price-row__name">${p.name}</span>
+            ${p.change !== null &&
+            html`<span class=${`price-row__change ${p.change > 0 ? 'price-row__change--up' : 'price-row__change--down'}`}>
+              ${p.change > 0 ? `↑ +${p.change}%` : `↓ −${-p.change}%`}
+            </span>`}
+            <${Money} kop=${last} forceKop=${last % 100 !== 0} />
+          </button>
+          ${open &&
+          html`<ul class="price-history">
+            ${p.history.map(
+              (h) => html`<li>
+                <span>${formatDay(h.date, { short: true })}</span>
+                <span class="muted">${h.shopId && shopById[h.shopId] ? shopName(shopById[h.shopId]) : ''}</span>
+                <${Money} kop=${h.amount} forceKop=${h.amount % 100 !== 0} />
+              </li>`,
+            )}
+          </ul>`}
+        </li>`;
+      })}
+    </ul>
+    ${prices.length > visible.length &&
+    html`<button class="link-btn card__pad" onClick=${() => setShowAll(true)}>Все товары (${prices.length})</button>`}
+  </section>`;
+}
 
 function ShopList() {
   const { shops, txs, period, setOpenShopId, openShopEdit, saveShop } = useApp();
@@ -52,6 +97,8 @@ function ShopList() {
     </section>
 
     <button class="btn btn--ghost btn--block" onClick=${() => openShopEdit({})}>+ Новый раздел</button>
+
+    <${PriceCard} />
 
     ${hidden.length > 0 &&
     html`<button class="link-btn" onClick=${() => setShowHidden(!showHidden)}>

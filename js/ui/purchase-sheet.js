@@ -4,7 +4,7 @@ import { html, useState, useEffect, useMemo } from '../lib/preact.js';
 import { BottomSheet, useApp, Money, Icon } from './common.js';
 import { parseAmount, toInputString, currencySymbol } from '../lib/money.js';
 import { addDays } from '../lib/dates.js';
-import { mainDailyEnvelope, shopName, itemSuggestions, lastPrice } from '../lib/budget.js';
+import { mainDailyEnvelope, shopName, itemSuggestions, lastPrice, priceChange } from '../lib/budget.js';
 
 const emptyRow = () => ({ name: '', price: '' });
 
@@ -24,6 +24,8 @@ export function PurchaseSheet({ opts, onClose }) {
 
   const suggestions = useMemo(() => itemSuggestions(txs), [txs]);
   const names = useMemo(() => [...suggestions.values()].map((s) => s.name), [suggestions]);
+  // Для пометки «подорожало» сравниваем с прошлой покупкой, не считая правимую
+  const prevPrices = useMemo(() => (editing ? itemSuggestions(txs.filter((t) => t.id !== editing.id)) : suggestions), [txs, editing, suggestions]);
 
   useEffect(() => {
     if (!opts) return;
@@ -63,6 +65,17 @@ export function PurchaseSheet({ opts, onClose }) {
     if (r.price.trim()) return;
     const p = lastPrice(suggestions, r.name);
     if (p) setRow(i, { price: toInputString(p) });
+  };
+  // «↑ +9% · было 3,20»: цена знакомого товара изменилась с прошлой покупки
+  const priceHint = (r) => {
+    const amount = parseAmount(r.price || '');
+    const prev = lastPrice(prevPrices, r.name);
+    const change = Number.isNaN(amount) ? null : priceChange(amount, prev);
+    if (change === null) return null;
+    const up = change > 0;
+    return html`<span class=${`item-row__hint ${up ? 'item-row__hint--up' : 'item-row__hint--down'}`}>
+      ${up ? `↑ подорожало на ${change}%` : `↓ подешевело на ${-change}%`} · было <${Money} kop=${prev} forceKop=${prev % 100 !== 0} />
+    </span>`;
   };
   const removeRow = (i) => setRows(rows.length > 1 ? rows.filter((_, j) => j !== i) : [emptyRow()]);
 
@@ -130,6 +143,7 @@ export function PurchaseSheet({ opts, onClose }) {
                       onInput=${(e) => setRow(i, { price: e.target.value })} />
                   </div>
                   <button type="button" class="icon-btn item-row__del" onClick=${() => removeRow(i)} aria-label=${`Убрать товар ${i + 1}`}>${Icon.close}</button>
+                  ${priceHint(r)}
                 </li>`,
               )}
             </ul>

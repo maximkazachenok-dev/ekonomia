@@ -422,6 +422,17 @@ label.btn { cursor: pointer; }
 .purchase__top { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; }
 .purchase__items { font-size: 14px; color: var(--muted); display: flex; flex-direction: column; gap: 2px; }
 .purchase__item { display: flex; justify-content: space-between; gap: 8px; }
+.item-row__hint { grid-column: 1 / -1; margin-top: -4px; font-size: 13px; }
+.item-row__hint--up { color: var(--over); }
+.item-row__hint--down { color: var(--ok); }
+.price-row { width: 100%; display: flex; align-items: baseline; gap: 10px; padding: 12px 16px; text-align: left; border-top: 1px solid var(--line); }
+.price-row:active { background: var(--surface-2); }
+.price-row__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.price-row__change { font-size: 13px; font-weight: 600; }
+.price-row__change--up { color: var(--over); }
+.price-row__change--down { color: var(--ok); }
+.price-history { display: flex; flex-direction: column; gap: 6px; padding: 0 16px 12px 28px; font-size: 14px; }
+.price-history li { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; }
 
 /* ── Голосовой ввод ─────────────────────────────────── */
 .voice { gap: 8px; }

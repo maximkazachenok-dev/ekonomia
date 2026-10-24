@@ -2,7 +2,7 @@
 import {
   getPeriod, previousPeriod, dailyAllowance, envelopeProgress, periodSummary, sumExpenses,
   mainDailyEnvelope, mandatoryEnvelopes, planPeriod, newPlan, withIncome, allocate, allocationsFromPrevious, applyEnvelopeToPlan, envelopeLimit,
-  itemsTotal, shopTotals, itemSuggestions, lastPrice, shopName,
+  itemsTotal, shopTotals, itemSuggestions, lastPrice, shopName, priceChange, priceList,
 } from '../js/lib/budget.js';
 import { parseAmount, formatAmount, toInputString } from '../js/lib/money.js';
 import { pluralDays, addDays, daysBetween } from '../js/lib/dates.js';
@@ -200,6 +200,17 @@ const sugg = itemSuggestions(purchases);
 eq(lastPrice(sugg, 'хлеб'), 350, 'подсказка: последняя цена хлеба');
 eq(lastPrice(sugg, ' ХЛЕБ'), 350, 'подсказка не зависит от регистра и пробелов');
 eq(lastPrice(sugg, 'сыр'), null, 'неизвестный товар — без подсказки');
+// История цен
+eq(priceChange(350, 320), 9, 'цена: 3,20 → 3,50 = +9%');
+eq(priceChange(300, 350), -14, 'цена: 3,50 → 3,00 = −14%');
+eq(priceChange(350, 350), null, 'цена не изменилась — без пометки');
+eq(priceChange(350, null), null, 'первая покупка — сравнивать не с чем');
+const prices = priceList(purchases);
+eq(prices.map((p) => p.name), ['Хлеб', 'Молоко', 'Мыло', 'Порошок'], 'цены: подорожавшие сверху, разовые покупки внизу по алфавиту');
+eq(prices[0].history.map((h) => h.amount), [350, 320, 300], 'история цен хлеба от новых к старым');
+eq(prices[0].history[1].shopId, 'gippo', 'в истории цен виден магазин');
+eq(prices[0].change, 9, 'хлеб подорожал на 9% к прошлой покупке');
+eq(prices[1].change, null, 'у разовой покупки нет изменения');
 eq(shopName({ defaultName: 'Другое' }), 'Другое', 'имя раздела по умолчанию');
 eq(shopName({ name: 'Мелочи', defaultName: 'Другое' }), 'Мелочи', 'переименованный раздел');
 // Покупки идут в главный дневной конверт — дневной лимит считает их как обычные траты

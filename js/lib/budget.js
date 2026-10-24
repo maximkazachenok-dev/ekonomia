@@ -132,6 +132,30 @@ export function lastPrice(suggestions, name) {
   return suggestions.get(normName(name || ''))?.amount ?? null;
 }
 
+// Изменение цены в процентах (целое). null — сравнивать не с чем или цена та же.
+export function priceChange(amount, prevAmount) {
+  if (!amount || !prevAmount || amount === prevAmount) return null;
+  return Math.round(((amount - prevAmount) / prevAmount) * 100);
+}
+
+// Цены на товары: [{ name, history: [{ date, shopId, amount }], change }], история от новых к старым.
+// change — изменение последней цены к предыдущей. Подорожавшие — сверху, товары с одной покупкой — внизу.
+export function priceList(txs) {
+  const map = new Map();
+  for (const t of txs) {
+    if (t.type !== 'expense') continue;
+    for (const it of t.items || []) {
+      const key = normName(it.name);
+      if (!key || !it.amount) continue;
+      if (!map.has(key)) map.set(key, { name: it.name.trim(), history: [] });
+      map.get(key).history.push({ date: t.date, shopId: t.shopId, amount: it.amount });
+    }
+  }
+  const list = [...map.values()].map((p) => ({ ...p, change: priceChange(p.history[0].amount, p.history[1]?.amount) }));
+  const rank = (p) => (p.history.length < 2 ? -Infinity : p.change ?? 0);
+  return list.sort((a, b) => rank(b) - rank(a) || a.name.localeCompare(b.name, 'ru'));
+}
+
 // Трата «до начала учёта», когда бюджет создают посреди периода.
 export function startingTransaction(user, envelopeId, { amount, date }) {
   return {
