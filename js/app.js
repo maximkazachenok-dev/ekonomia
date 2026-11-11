@@ -90,6 +90,14 @@ function Budget({ backend, user, fid }) {
     if (shops && DEFAULT_SHOPS.some((d) => !shops.find((s) => s.id === d.id))) backend.ensureDefaultShops(fid);
   }, [shops === null]);
 
+  // v1.7.0: главный конверт «Магазин» переименован в «Расходы» (один раз; потом имя можно менять как угодно)
+  useEffect(() => {
+    if (!family || !envelopes || family.migrations?.mainRenamed) return;
+    const main = mainDailyEnvelope(envelopes);
+    if (main?.name === 'Магазин') backend.saveEnvelope(fid, { id: main.id, name: 'Расходы' }).catch(() => {});
+    backend.updateFamily(fid, { 'migrations.mainRenamed': true }).catch(() => {});
+  }, [Boolean(family && envelopes)]);
+
   const envById = useMemo(() => Object.fromEntries((envelopes || []).map((e) => [e.id, e])), [envelopes]);
   const shopById = useMemo(() => Object.fromEntries((shops || []).map((s) => [s.id, s])), [shops]);
 

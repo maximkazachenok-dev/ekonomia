@@ -46,7 +46,7 @@ export function Onboarding({ backend, user }) {
     setBusy(true);
     setError('');
     // Главный конверт: свободные деньги на каждый день (магазины, бытовая химия, мелочи)
-    const envelopes = [{ name: 'Покупки', icon: '🛒', color: ENVELOPE_COLORS[0], kind: 'daily', limit: Math.max(0, totals.free) }];
+    const envelopes = [{ name: 'Расходы', icon: '🛒', color: ENVELOPE_COLORS[0], kind: 'daily', limit: Math.max(0, totals.free) }];
     // Начали вести учёт посреди периода: уже потраченное записываем первой строкой, иначе лимит завышен
     if (midPeriod && spentKop > 0) envelopes[0].initialSpent = { amount: spentKop, date: period.start };
     chosen.forEach((t, i) => {

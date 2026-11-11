@@ -23,10 +23,13 @@ export function TxSheet({ opts, onClose }) {
   const [date, setDate] = useState(today);
   const [showMore, setShowMore] = useState(false);
   const [shopId, setShopId] = useState('other');
+  // Новый раздел дневных расходов («Столовая») создаётся прямо здесь, вместе с тратой
+  const [newShop, setNewShop] = useState(null);
 
   useEffect(() => {
     if (!opts) return;
     setShopId('other');
+    setNewShop(null);
     setAmount(editing ? toInputString(editing.amount) : '');
     setEnvelopeId(defaultEnv);
     setType(editing?.type || opts.type || 'expense');
@@ -38,10 +41,30 @@ export function TxSheet({ opts, onClose }) {
   if (!opts) return null;
 
   const kop = parseAmount(amount || '0');
-  const valid = kop > 0 && envelopeId;
   const env = envById[envelopeId];
-  // Траты из свободных денег относятся к разделу (магазину или «Другое»)
-  const isMainDaily = !editing && envelopeId === mainDailyEnvelope(envelopes)?.id;
+  const main = mainDailyEnvelope(envelopes);
+  // Траты из свободных денег относятся к разделу (магазину, «Столовой» или «Другое»)
+  const isMainDaily = !editing && envelopeId === main?.id;
+  const activeShops = shops.filter((s) => !s.archived);
+  const newName = (newShop || '').trim();
+  const sameShop = newName && activeShops.find((s) => shopName(s).toLowerCase() === newName.toLowerCase());
+  const valid = kop > 0 && envelopeId && (newShop === null || newName);
+
+  // Один список: разделы дневного лимита и остальные категории. При правке — только категории.
+  const where = newShop !== null ? 'new' : isMainDaily ? `shop:${shopId}` : `env:${envelopeId}`;
+  const pick = (v) => {
+    if (v === 'new') {
+      setEnvelopeId(main.id);
+      setNewShop('');
+      return;
+    }
+    setNewShop(null);
+    if (v.startsWith('shop:')) {
+      setEnvelopeId(main.id);
+      setShopId(v.slice(5));
+    } else setEnvelopeId(v.slice(4));
+  };
+  const others = spendable.filter((e) => editing || e.id !== main?.id);
 
   const title = editing
     ? 'Изменить запись'
@@ -49,11 +72,17 @@ export function TxSheet({ opts, onClose }) {
       ? type === 'deposit' ? `Отложить в «${presetEnv.name}»` : `Взять из «${presetEnv.name}»`
       : 'Новая трата';
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e?.preventDefault();
     if (!valid) return;
     const data = { amount: kop, envelopeId, type, note: note.trim(), date };
-    if (isMainDaily) data.shopId = shopId;
+    if (isMainDaily) {
+      data.shopId = shopId;
+      if (newShop !== null) {
+        data.shopId = sameShop?.id || (await app.saveShop({ name: newName, icon: '🧾', order: Date.now(), archived: false }));
+        if (!data.shopId) return;
+      }
+    }
     if (editing) app.updateTx(editing, data);
     else app.addTx({ ...data, createdBy: { uid: user.uid, name: user.name }, createdAt: Date.now() });
     onClose();
@@ -72,28 +101,23 @@ export function TxSheet({ opts, onClose }) {
       </div>
 
       ${!isSavings &&
-      html`<div class="chips" role="radiogroup" aria-label="Конверт">
-        ${spendable.map(
-          (e) => html`<button
-            type="button"
-            role="radio"
-            aria-checked=${e.id === envelopeId}
-            class=${`chip ${e.id === envelopeId ? 'chip--active' : ''}`}
-            style=${{ '--chip': e.color }}
-            onClick=${() => setEnvelopeId(e.id)}
-          >
-            <span class="chip__icon">${e.icon}</span>${e.name}
-          </button>`,
-        )}
-      </div>`}
+      html`<select class="input tx-select" value=${where} onChange=${(e) => pick(e.target.value)} aria-label="На что потрачено">
+        ${!editing &&
+        main &&
+        html`<optgroup label=${`Из дневного лимита — «${main.name}»`}>
+          ${activeShops.map((s) => html`<option value=${`shop:${s.id}`}>${s.icon || '🏪'} ${shopName(s)}</option>`)}
+          <option value="new">＋ Новый раздел (например, Столовая)…</option>
+        </optgroup>`}
+        ${others.length > 0 &&
+        html`<optgroup label=${editing ? 'Категории' : 'Отдельные категории'}>
+          ${others.map((e) => html`<option value=${`env:${e.id}`}>${e.icon} ${e.name}</option>`)}
+        </optgroup>`}
+      </select>`}
 
-      ${isMainDaily &&
-      html`<div class="chips chips--scroll" role="radiogroup" aria-label="Раздел">
-        ${shops.filter((s) => !s.archived).map(
-          (s) => html`<button type="button" role="radio" aria-checked=${s.id === shopId} class=${`chip chip--small ${s.id === shopId ? 'chip--active' : ''}`} onClick=${() => setShopId(s.id)}>
-            <span class="chip__icon">${s.icon || '🏪'}</span>${shopName(s)}
-          </button>`,
-        )}
+      ${newShop !== null &&
+      html`<div class="tx-newshop">
+        <input class="input" value=${newShop} onInput=${(e) => setNewShop(e.target.value)} placeholder="Название: Столовая, Кофе…" maxlength="30" aria-label="Название нового раздела" />
+        <span class="field__hint">${sameShop ? 'Такой раздел уже есть — трата попадёт в него.' : `Трата вычтется из дневного лимита, а сумма по разделу будет видна во вкладке «Магазины» и в статистике.`}</span>
       </div>`}
 
       ${showMore
@@ -117,7 +141,7 @@ export function TxSheet({ opts, onClose }) {
         ${editing && html`<button type="button" class="btn btn--danger-ghost" onClick=${remove}>Удалить</button>`}
         <button type="submit" class="btn btn--primary btn--grow" disabled=${!valid}>
           ${editing ? 'Сохранить' : isSavings ? (type === 'deposit' ? 'Отложить' : 'Взять') : 'Записать'}
-          ${valid && env && !isSavings && html`<span class="btn__hint">в «${env.name}»</span>`}
+          ${valid && env && !isSavings && !isMainDaily && html`<span class="btn__hint">в «${env.name}»</span>`}
         </button>
       </div>
     </form>

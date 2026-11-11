@@ -109,7 +109,7 @@ export const Icon = {
 };
 
 export const ENVELOPE_ICONS = ['🛒', '💅', '💇', '⛽', '🔧', '🐷', '💊', '👶', '🍽️', '🚌', '🏠', '📱', '🎁', '🎉', '👕', '🐾', '📚', '✈️', '💡', '☕'];
-export const SHOP_ICONS = ['🏪', '🛒', '🧺', '🥖', '🍎', '🥩', '🧴', '🧾', '💊', '🐾', '👶', '🏠', '🍷', '🎁'];
+export const SHOP_ICONS = ['🏪', '🍽️', '☕', '🛒', '🧺', '🥖', '🍎', '🥩', '🧴', '🧾', '💊', '🐾', '👶', '🏠', '🍷', '🎁'];
 export const ENVELOPE_COLORS = ['#1F9D6B', '#D9468A', '#7B61FF', '#E8833A', '#3B82C4', '#C9A227', '#0E9AA7', '#8A6D5B'];
 
 export const KIND_LABELS = {
