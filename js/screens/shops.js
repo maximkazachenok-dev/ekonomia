@@ -1,4 +1,4 @@
-// Вкладка «Магазины»: разделы покупок (магазины и категории) и покупки в них.
+// Вкладка «Расходы» (раньше «Магазины»): разделы покупок (магазины и категории) и покупки в них.
 import { html, useState, useMemo } from '../lib/preact.js';
 import { useApp, Money, Icon } from '../ui/common.js';
 import { shopName, shopTotals, priceList } from '../lib/budget.js';
@@ -70,7 +70,7 @@ function ShopList() {
     <header class="screen__head">
       <div>
         <p class="eyebrow">${formatDay(period.start, { short: true })} — ${formatDay(period.end, { short: true })}</p>
-        <h1 class="screen__title">Магазины</h1>
+        <h1 class="screen__title">Расходы</h1>
       </div>
     </header>
     ${spentAll > 0 && html`<p class="muted">За период в разделах потрачено <${Money} kop=${spentAll} /></p>`}
@@ -127,7 +127,7 @@ function ShopDetail({ shop }) {
 
   return html`<div class="screen">
     <header class="shop-head">
-      <button class="icon-btn" onClick=${() => setOpenShopId(null)} aria-label="Назад к магазинам">${Icon.back}</button>
+      <button class="icon-btn" onClick=${() => setOpenShopId(null)} aria-label="Назад к разделам">${Icon.back}</button>
       <h1 class="screen__title">${shop.icon || '🏪'} ${shopName(shop)}</h1>
       <button class="link-btn" onClick=${() => openShopEdit(shop)}>Изменить</button>
     </header>

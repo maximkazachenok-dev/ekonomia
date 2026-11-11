@@ -20,7 +20,7 @@ function PeriodDetails({ s }) {
       )}
     </ul>
     ${shops.length > 0 &&
-    html`<p class="stats__sub muted">По магазинам</p>
+    html`<p class="stats__sub muted">По разделам</p>
       <ul class="stats__cats">
         ${shops.map(
           ([id, t]) => html`<li key=${id}>

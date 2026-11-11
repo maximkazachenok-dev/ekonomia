@@ -117,7 +117,7 @@ export function TxSheet({ opts, onClose }) {
       ${newShop !== null &&
       html`<div class="tx-newshop">
         <input class="input" value=${newShop} onInput=${(e) => setNewShop(e.target.value)} placeholder="Название: Столовая, Кофе…" maxlength="30" aria-label="Название нового раздела" />
-        <span class="field__hint">${sameShop ? 'Такой раздел уже есть — трата попадёт в него.' : `Трата вычтется из дневного лимита, а сумма по разделу будет видна во вкладке «Магазины» и в статистике.`}</span>
+        <span class="field__hint">${sameShop ? 'Такой раздел уже есть — трата попадёт в него.' : `Трата вычтется из дневного лимита, а сумма по разделу будет видна во вкладке «Расходы» и в статистике.`}</span>
       </div>`}
 
       ${showMore

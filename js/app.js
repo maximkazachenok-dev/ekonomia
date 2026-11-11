@@ -40,7 +40,7 @@ function useToday() {
 
 const TABS = [
   { id: 'home', label: 'Главная', icon: Icon.home },
-  { id: 'shops', label: 'Магазины', icon: Icon.bag },
+  { id: 'shops', label: 'Расходы', icon: Icon.bag },
   { id: 'history', label: 'История', icon: Icon.list },
   { id: 'savings', label: 'Копилки', icon: Icon.piggy },
   { id: 'settings', label: 'Настройки', icon: Icon.settings },
