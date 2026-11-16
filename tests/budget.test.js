@@ -3,7 +3,7 @@ import {
   getPeriod, previousPeriod, dailyAllowance, envelopeProgress, periodSummary, sumExpenses,
   mainDailyEnvelope, mandatoryEnvelopes, planPeriod, newPlan, withIncome, allocate, allocationsFromPrevious, applyEnvelopeToPlan, envelopeLimit,
   itemsTotal, shopTotals, itemSuggestions, lastPrice, shopName, priceChange, priceList,
-  periodsSince, periodStats, statsTotals,
+  periodsSince, periodStats, statsTotals, monogram,
 } from '../js/lib/budget.js';
 import { parseAmount, formatAmount, toInputString } from '../js/lib/money.js';
 import { pluralDays, addDays, daysBetween } from '../js/lib/dates.js';
@@ -247,6 +247,13 @@ eq(statsTotals([oct, sep, aug], '2026-10-24'), { saved: 3000, plannedCount: 1, a
 eq(statsTotals([oct], '2026-10-24'), { saved: 0, plannedCount: 0, avgSpent: 0, since: null }, 'итог: закрытых периодов ещё нет');
 const overPlan = { ...sepPlan, free: 50000 };
 eq(periodStats({ envelopes: sEnvs, txs: sTxs, period: getPeriod('2026-09-20', 10), plan: overPlan }).left, -37000, 'перерасход периода — с минусом');
+
+// ── Значок-монограмма ──
+eq(monogram('Топливо'), 'То', 'значок: одно слово — две первые буквы');
+eq(monogram('ремонт авто'), 'Ра', 'значок: два слова — первые буквы слов');
+eq(monogram('Бытовая химия и гигиена'), 'Бх', 'значок: союз «и» не считается словом');
+eq(monogram(' Я '), 'Я', 'значок: одна буква');
+eq(monogram(''), '•', 'значок: пустое название');
 
 out(`\n${failed ? '✗' : '✓'} Пройдено: ${passed}, упало: ${failed}`);
 if (typeof globalThis.__testResult === 'function') globalThis.__testResult(passed, failed);

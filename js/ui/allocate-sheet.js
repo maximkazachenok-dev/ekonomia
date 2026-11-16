@@ -31,7 +31,7 @@ export function AllocateSheet({ env, onClose }) {
     onClose();
   };
 
-  return html`<${BottomSheet} open=${true} onClose=${onClose} title=${`${env.icon} ${env.name}`}>
+  return html`<${BottomSheet} open=${true} onClose=${onClose} title=${env.name}>
     <div class="tx-form">
       <div class=${`amount-display ${kop > 0 ? '' : 'amount-display--empty'}`} aria-live="polite">
         <span class="amount-display__value">${amount || '0'}</span>

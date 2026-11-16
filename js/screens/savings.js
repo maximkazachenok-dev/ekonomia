@@ -1,5 +1,5 @@
 import { html } from '../lib/preact.js';
-import { useApp, Money, ProgressBar } from '../ui/common.js';
+import { useApp, Money, ProgressBar, Mono } from '../ui/common.js';
 import { savingsProgress } from '../lib/budget.js';
 import { TxRow } from './history.js';
 
@@ -24,7 +24,7 @@ export function SavingsScreen() {
       const ops = txs.filter((t) => t.envelopeId === e.id).slice(0, 5);
       return html`<section class="card" key=${e.id} style=${{ '--env': e.color }}>
         <div class="goal">
-          <span class="goal__icon" style=${{ background: e.color + '22' }}>${e.icon}</span>
+          <${Mono} name=${e.name} color=${e.color} size="md" />
           <div class="goal__main">
             <button class="goal__name" onClick=${() => openEnvelope(e)}>${e.name}</button>
             <div class="goal__balance"><${Money} kop=${s.balance} /></div>

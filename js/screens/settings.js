@@ -1,5 +1,5 @@
 import { html, useState } from '../lib/preact.js';
-import { useApp, Icon, KIND_LABELS, showToast, Money } from '../ui/common.js';
+import { useApp, Icon, KIND_LABELS, showToast, Money, Mono } from '../ui/common.js';
 import { CURRENCIES, formatAmount } from '../lib/money.js';
 import { envelopeLimit, shopName } from '../lib/budget.js';
 
@@ -117,7 +117,7 @@ export function SettingsScreen() {
         ${visible.map(
           (e) => html`<li key=${e.id}>
             <button class=${`env-row ${e.archived ? 'env-row--archived' : ''}`} onClick=${() => openEnvelope(e)}>
-              <span class="env-row__icon" style=${{ background: e.color + '22' }}>${e.icon}</span>
+              <${Mono} name=${e.name} color=${e.color} />
               <span class="env-row__main">
                 <span class="env-row__name">${e.name}${e.archived ? ' (скрыт)' : ''}</span>
                 <span class="env-row__sub muted">
@@ -171,6 +171,6 @@ export function SettingsScreen() {
       <button class="btn btn--danger-ghost btn--block" onClick=${() => backend.signOut()}>Выйти</button>
     </section>`}
 
-    <p class="footnote">Экономия денег · v1.7.1</p>
+    <p class="footnote">Экономия денег · v1.8.0</p>
   </div>`;
 }

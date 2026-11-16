@@ -1,7 +1,7 @@
 // Первый запуск: создать семейный бюджет (3 шага) или вступить по коду.
 // Шаги: день зарплаты → категории расходов → доход. Доход делится по дням; распределение — на главном экране.
 import { html, useState } from '../lib/preact.js';
-import { ENVELOPE_COLORS } from '../ui/common.js';
+import { ENVELOPE_COLORS, Mono } from '../ui/common.js';
 import { parseAmount, currencySymbol, formatMoney, CURRENCIES } from '../lib/money.js';
 import { getPeriod, planPeriod } from '../lib/budget.js';
 import { todayISO, formatDay, pluralDays, daysBetween } from '../lib/dates.js';
@@ -80,7 +80,7 @@ export function Onboarding({ backend, user }) {
 
   if (mode === 'choose') {
     return html`<div class="onb">
-      <div class="onb__logo">💰</div>
+      <img class="onb__logo" src="icons/app-192.png" alt="" />
       <h1 class="onb__title">Привет, ${user.name}!</h1>
       <p class="onb__text">Вы первый в семье или вас пригласили?</p>
       <button class="btn btn--primary btn--block btn--lg" onClick=${() => setMode('create')}>Создать семейный бюджет</button>
@@ -129,7 +129,7 @@ export function Onboarding({ backend, user }) {
           (t, i) => html`<li class=${`tpl ${t.on ? 'tpl--on' : ''}`}>
             <label class="tpl__check">
               <input type="checkbox" checked=${t.on} onChange=${(e) => setItems(items.map((x, j) => (j === i ? { ...x, on: e.target.checked } : x)))} />
-              <span class="tpl__icon">${t.icon}</span>
+              <${Mono} name=${t.name} />
               <span>${t.name}${t.kind === 'savings' ? html`<small class="muted"> копилка</small>` : ''}</span>
             </label>
           </li>`,

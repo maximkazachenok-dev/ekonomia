@@ -107,7 +107,7 @@ export function PurchaseSheet({ opts, onClose }) {
       <div class="chips chips--scroll" role="radiogroup" aria-label="Раздел">
         ${visibleShops.map(
           (s) => html`<button type="button" role="radio" aria-checked=${s.id === shopId} class=${`chip ${s.id === shopId ? 'chip--active' : ''}`} onClick=${() => setShopId(s.id)}>
-            <span class="chip__icon">${s.icon || '🏪'}</span>${shopName(s)}
+            ${shopName(s)}
           </button>`,
         )}
         <button type="button" class="chip" onClick=${() => openShopEdit({})}>+ Раздел</button>

@@ -28,7 +28,7 @@ export function SummarySheet({ open, onClose }) {
       createdAt: Date.now(),
     }, { silent: true });
     markDone();
-    showToast(`Отложено ${formatMoney(s.totalSaved, family.currency)} в «${env.name}» 🎉`);
+    showToast(`Отложено ${formatMoney(s.totalSaved, family.currency)} в «${env.name}»`);
     onClose();
   };
 
@@ -49,7 +49,7 @@ export function SummarySheet({ open, onClose }) {
     <ul class="summary__rows">
       ${s.rows.map(
         (r) => html`<li>
-          <span class="summary__name"><span>${r.envelope.icon}</span>${r.envelope.name}</span>
+          <span class="summary__name">${r.envelope.name}</span>
           <span class="summary__bars">
             <span class="summary__bar summary__bar--limit" style=${{ width: `${(r.limit / maxSpent) * 100}%` }}></span>
             <span class=${`summary__bar ${r.saved < 0 ? 'summary__bar--over' : ''}`} style=${{ width: `${(r.spent / maxSpent) * 100}%`, background: r.saved < 0 ? undefined : r.envelope.color }}></span>
@@ -66,7 +66,7 @@ export function SummarySheet({ open, onClose }) {
           <label class="field">
             <span class="field__label">Отложить сэкономленное в копилку</span>
             <select class="input input--select" value=${target} onChange=${(e) => setTarget(e.target.value)}>
-              ${savings.map((e) => html`<option value=${e.id}>${e.icon} ${e.name}</option>`)}
+              ${savings.map((e) => html`<option value=${e.id}>${e.name}</option>`)}
             </select>
           </label>
           <button class="btn btn--primary btn--block" onClick=${transfer}>Отложить ${formatMoney(s.totalSaved, family.currency)}</button>

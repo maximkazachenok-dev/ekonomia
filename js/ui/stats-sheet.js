@@ -12,7 +12,7 @@ function PeriodDetails({ s }) {
     <ul class="stats__cats">
       ${s.rows.map(
         (r) => html`<li key=${r.envelope.id}>
-          <span class="summary__name"><span>${r.envelope.icon}</span>${r.envelope.name}</span>
+          <span class="summary__name">${r.envelope.name}</span>
           <span>
             <span class=${r.limit !== null && r.spent > r.limit ? 'neg' : ''}><${Money} kop=${r.spent} /></span>${r.limit !== null ? html`<span class="muted"> из <${Money} kop=${r.limit} /></span>` : ''}
           </span>
@@ -24,7 +24,7 @@ function PeriodDetails({ s }) {
       <ul class="stats__cats">
         ${shops.map(
           ([id, t]) => html`<li key=${id}>
-            <span class="summary__name"><span>${shopById[id]?.icon || '🏪'}</span>${shopName(shopById[id])}</span>
+            <span class="summary__name">${shopName(shopById[id])}</span>
             <${Money} kop=${t.spent} />
           </li>`,
         )}
@@ -109,6 +109,6 @@ export function StatsSheet({ open, onClose }) {
         </li>`;
       })}
     </ul>
-    <p class="field__hint">Полоса — потрачено, пунктир — сколько было запланировано. «+» — осталось от плана, «−» — перерасход. Нажмите на месяц, чтобы увидеть категории и магазины.</p>
+    <p class="field__hint">Тёмная полоса — потрачено, светлая — сколько было запланировано. «+» — осталось от плана, «−» — перерасход. Нажмите на месяц, чтобы увидеть категории и магазины.</p>
   <//>`;
 }

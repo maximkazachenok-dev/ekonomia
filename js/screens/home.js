@@ -1,10 +1,28 @@
 import { html } from '../lib/preact.js';
-import { useApp, Money, ProgressBar, Icon } from '../ui/common.js';
+import { useApp, Money, ProgressBar, Icon, Mono } from '../ui/common.js';
 import { dailyAllowance, envelopeProgress, savingsProgress, envelopeLimit, mandatoryEnvelopes, allocationsFromPrevious, periodStats } from '../lib/budget.js';
-import { formatDay, pluralDays } from '../lib/dates.js';
+import { formatDay, pluralDays, addDays, daysBetween, parseISO } from '../lib/dates.js';
 import { formatMoney } from '../lib/money.js';
 import { TxRow } from './history.js';
 import { VoiceCard } from '../ui/voice-card.js';
+
+// Линейка периода: штрих на каждый день от зарплаты до зарплаты.
+// Прошедшие дни тёмные, сегодняшний — выделен и выше, выходные чуть короче.
+function PeriodRuler({ period, today, daysLeft }) {
+  const passed = daysBetween(period.start, today);
+  const ticks = Array.from({ length: period.days }, (_, i) => {
+    const wd = new Date(parseISO(addDays(period.start, i))).getUTCDay();
+    return `ruler__tick ${i < passed ? 'ruler__tick--past' : i === passed ? 'ruler__tick--today' : ''} ${wd === 0 || wd === 6 ? 'ruler__tick--short' : ''}`;
+  });
+  return html`<div class="ruler">
+    <div class="ruler__ticks" aria-hidden="true">${ticks.map((c) => html`<span class=${c}></span>`)}</div>
+    <div class="ruler__labels">
+      <span>${formatDay(period.start, { short: true })}</span>
+      <span class="ruler__now">${daysLeft === 1 ? 'последний день' : `осталось ${pluralDays(daysLeft)}`}</span>
+      <span>${formatDay(period.end, { short: true })}</span>
+    </div>
+  </div>`;
+}
 
 function DailyCard({ env, hero }) {
   const { txs, today, period, family, openTx, plan } = useApp();
@@ -25,26 +43,27 @@ function DailyCard({ env, hero }) {
 
   return html`<section class=${`card daily daily--${d.status} ${hero ? 'daily--hero' : ''}`} style=${{ '--env': env.color }}>
     <button class="daily__tap" onClick=${() => openTx({ envelopeId: env.id })} aria-label=${`Добавить трату в «${env.name}»`}>
-      <div class="daily__label"><span class="daily__icon">${env.icon}</span>${headline}</div>
+      <div class="daily__label">${headline}</div>
       <div class="daily__amount"><${Money} kop=${d.leftToday < 0 ? d.leftToday : Math.max(0, d.leftToday)} big /></div>
       <div class="daily__sub">
         ${d.spentToday > 0
           ? html`потрачено <${Money} kop=${d.spentToday} /> из <${Money} kop=${Math.max(0, d.todayLimit)} /> на сегодня`
           : html`это лимит на сегодня`}
       </div>
-      <${ProgressBar} percent=${usedPct} status=${d.status} />
+      ${!hero && html`<${ProgressBar} percent=${usedPct} status=${d.status} />`}
     </button>
+    ${hero && html`<${PeriodRuler} period=${period} today=${today} daysLeft=${d.daysLeft} />`}
     <dl class="daily__stats">
       <div>
         <dt>Осталось до ${formatDay(period.end, { short: true })}</dt>
         <dd><${Money} kop=${d.remainingTotal} /> <span class="muted">из ${formatMoney(limit, cur)}</span></dd>
       </div>
       <div>
-        <dt>${d.daysLeft === 1 ? 'Последний день' : pluralDays(d.daysLeft)}</dt>
+        <dt>Завтра будет</dt>
         <dd>
           ${d.tomorrow !== null
-            ? html`завтра ≈ <${Money} kop=${Math.max(0, d.tomorrow)} />`
-            : html`завтра зарплата 🎉`}
+            ? html`≈ <${Money} kop=${Math.max(0, d.tomorrow)} />`
+            : html`зарплата`}
         </dd>
       </div>
     </dl>
@@ -95,7 +114,7 @@ function AllocationCard() {
         const notDeposited = e.kind === 'savings' && amount > 0 && !plan.savingsTx?.[e.id];
         return html`<li key=${e.id}>
           <button class="env-row" onClick=${() => openAllocate(e)} aria-label=${`Распределить на «${e.name}»`}>
-            <span class="env-row__icon" style=${{ background: e.color + '22' }}>${e.icon}</span>
+            <${Mono} name=${e.name} color=${e.color} />
             <span class="env-row__main">
               <span class="env-row__top">
                 <span class="env-row__name">${e.name}</span>
@@ -137,7 +156,7 @@ function SavingsCard({ envelopes }) {
         const s = savingsProgress(e);
         return html`<li>
           <button class="env-row" onClick=${() => setTab('savings')}>
-            <span class="env-row__icon" style=${{ background: e.color + '22' }}>${e.icon}</span>
+            <${Mono} name=${e.name} color=${e.color} />
             <span class="env-row__main">
               <span class="env-row__top">
                 <span class="env-row__name">${e.name}</span>
@@ -184,8 +203,8 @@ export function HomeScreen() {
   return html`<div class="screen">
     <header class="screen__head">
       <div>
-        <p class="eyebrow">${family.name}</p>
-        <h1 class="screen__title">${formatDay(period.start, { short: true })} — ${formatDay(period.end, { short: true })}</h1>
+        <p class="eyebrow">${family.name} · ${formatDay(period.start, { short: true })} — ${formatDay(period.end, { short: true })}</p>
+        <h1 class="screen__title">Сегодня</h1>
       </div>
     </header>
 

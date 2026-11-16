@@ -1,5 +1,6 @@
 import { html, useEffect, useState, createContext, useContext } from '../lib/preact.js';
 import { formatAmount, currencySymbol } from '../lib/money.js';
+import { monogram } from '../lib/budget.js';
 
 export const AppContext = createContext(null);
 export const useApp = () => useContext(AppContext);
@@ -10,6 +11,11 @@ export function Money({ kop, currency, big = false, forceKop = false }) {
   return html`<span class=${big ? 'money money--big' : 'money'}
     >${formatAmount(kop, { forceKop })}<span class="money__cur">${currencySymbol(cur)}</span></span
   >`;
+}
+
+// Значок категории или раздела: две буквы названия на плитке её цвета (без цвета — нейтральная).
+export function Mono({ name, color, size, shade }) {
+  return html`<span class=${`mono ${size ? `mono--${size}` : ''} ${shade != null ? `mono--shade${shade}` : ''}`} style=${color ? { '--c': color } : undefined} aria-hidden="true">${monogram(name)}</span>`;
 }
 
 export function ProgressBar({ percent, status = 'ok', thin = false }) {
@@ -35,7 +41,7 @@ export function BottomSheet({ open, onClose, title, children }) {
       <div class="sheet__grip"></div>
       <div class="sheet__head">
         <h2 class="sheet__title">${title}</h2>
-        <button class="icon-btn" onClick=${onClose} aria-label="Закрыть">${Icon.close}</button>
+        <button class="icon-btn icon-btn--close" onClick=${onClose} aria-label="Закрыть">${Icon.close}</button>
       </div>
       <div class="sheet__body">${children}</div>
     </div>
@@ -108,8 +114,6 @@ export const Icon = {
   trophy: svg('<path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0V4zM17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/>'),
 };
 
-export const ENVELOPE_ICONS = ['🛒', '💅', '💇', '⛽', '🔧', '🐷', '💊', '👶', '🍽️', '🚌', '🏠', '📱', '🎁', '🎉', '👕', '🐾', '📚', '✈️', '💡', '☕'];
-export const SHOP_ICONS = ['🏪', '🍽️', '☕', '🛒', '🧺', '🥖', '🍎', '🥩', '🧴', '🧾', '💊', '🐾', '👶', '🏠', '🍷', '🎁'];
 export const ENVELOPE_COLORS = ['#1F9D6B', '#D9468A', '#7B61FF', '#E8833A', '#3B82C4', '#C9A227', '#0E9AA7', '#8A6D5B'];
 
 export const KIND_LABELS = {

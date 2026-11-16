@@ -1,6 +1,6 @@
 // Вкладка «Расходы» (раньше «Магазины»): разделы покупок (магазины и категории) и покупки в них.
 import { html, useState, useMemo } from '../lib/preact.js';
-import { useApp, Money, Icon } from '../ui/common.js';
+import { useApp, Money, Icon, Mono } from '../ui/common.js';
 import { shopName, shopTotals, priceList } from '../lib/budget.js';
 import { relativeDay, formatDay } from '../lib/dates.js';
 
@@ -65,6 +65,12 @@ function ShopList() {
   const active = shops.filter((s) => !s.archived);
   const hidden = shops.filter((s) => s.archived);
   const spentAll = Object.values(totals).reduce((s, t) => s + t.spent, 0);
+  // Доли разделов: от самого затратного (тёмный) к наименее затратному (светлый); дальше четвёртого — один оттенок
+  const ranked = active.filter((s) => totals[s.id]?.spent > 0).sort((a, b) => totals[b.id].spent - totals[a.id].spent);
+  const shadeOf = (s) => {
+    const i = ranked.indexOf(s);
+    return i < 0 ? undefined : Math.min(i, 3);
+  };
 
   return html`<div class="screen">
     <header class="screen__head">
@@ -73,7 +79,13 @@ function ShopList() {
         <h1 class="screen__title">Расходы</h1>
       </div>
     </header>
-    ${spentAll > 0 && html`<p class="muted">За период в разделах потрачено <${Money} kop=${spentAll} /></p>`}
+    ${spentAll > 0 &&
+    html`<div class="share">
+      <p class="share__total"><${Money} kop=${spentAll} forceKop=${spentAll % 100 !== 0} /> <span class="muted">из дневного лимита</span></p>
+      <div class="share__bar" role="img" aria-label=${`Доли разделов: ${ranked.map((s) => `${shopName(s)} ${Math.round((totals[s.id].spent / spentAll) * 100)}%`).join(', ')}`}>
+        ${ranked.map((s) => html`<span class=${`share__seg mono--shade${shadeOf(s)}`} style=${{ flexGrow: totals[s.id].spent }}></span>`)}
+      </div>
+    </div>`}
 
     <section class="card card--flush">
       <ul class="env-list">
@@ -81,7 +93,7 @@ function ShopList() {
           const t = totals[s.id];
           return html`<li key=${s.id}>
             <button class="env-row" onClick=${() => { setOpenShopId(s.id); window.scrollTo(0, 0); }}>
-              <span class="env-row__icon" style=${{ background: 'var(--surface-2)' }}>${s.icon || '🏪'}</span>
+              <${Mono} name=${shopName(s)} shade=${shadeOf(s)} />
               <span class="env-row__main">
                 <span class="env-row__top">
                   <span class="env-row__name">${shopName(s)}</span>
@@ -109,7 +121,7 @@ function ShopList() {
       <ul class="env-list">
         ${hidden.map(
           (s) => html`<li key=${s.id} class="env-row env-row--archived">
-            <span class="env-row__icon">${s.icon || '🏪'}</span>
+            <${Mono} name=${shopName(s)} />
             <span class="env-row__main"><span class="env-row__name">${shopName(s)}</span></span>
             <button class="link-btn" onClick=${() => saveShop({ id: s.id, archived: false })}>Вернуть</button>
           </li>`,
@@ -128,7 +140,7 @@ function ShopDetail({ shop }) {
   return html`<div class="screen">
     <header class="shop-head">
       <button class="icon-btn" onClick=${() => setOpenShopId(null)} aria-label="Назад к разделам">${Icon.back}</button>
-      <h1 class="screen__title">${shop.icon || '🏪'} ${shopName(shop)}</h1>
+      <h1 class="screen__title">${shopName(shop)}</h1>
       <button class="link-btn" onClick=${() => openShopEdit(shop)}>Изменить</button>
     </header>
     <p class="muted">

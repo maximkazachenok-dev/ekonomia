@@ -63,14 +63,13 @@ export function VoiceCard() {
     }
   };
 
-  return html`<section class="card voice">
-    <h2 class="card__title">Продиктуйте или напишите покупку</h2>
+  return html`<section class="voice">
     <form class="voice__row" onSubmit=${(e) => { e.preventDefault(); submit(); }}>
       <input class="input voice__input" value=${text} onInput=${(e) => setText(e.target.value)}
-        placeholder="в Гиппо хлеб 3,5, молоко 2,8" enterkeyhint="done" autocomplete="off" aria-label="Фраза о покупке" />
+        placeholder="Продиктуйте: в Гиппо хлеб 3,5" enterkeyhint="done" autocomplete="off" aria-label="Фраза о покупке" />
       ${Recognition && !isIOS &&
       html`<button type="button" class=${`voice__mic ${listening ? 'voice__mic--on' : ''}`} onClick=${listen} aria-label=${listening ? 'Остановить запись' : 'Говорить'}>${mic}</button>`}
-      <button type="submit" class="btn btn--primary voice__go" disabled=${!text.trim()} aria-label="Разобрать фразу">${Icon.chevron}</button>
+      <button type="submit" class="voice__go" disabled=${!text.trim()} aria-label="Разобрать фразу">${Icon.chevron}</button>
     </form>
     <p class="field__hint">
       ${listening

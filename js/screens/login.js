@@ -30,7 +30,7 @@ export function LoginScreen({ backend }) {
   };
 
   return html`<form class="onb" onSubmit=${submit}>
-    <div class="onb__logo">💰</div>
+    <img class="onb__logo" src="icons/app-192.png" alt="" />
     <h1 class="onb__title">Экономия денег</h1>
     <p class="onb__text">
       ${mode === 'signup' ? 'Создайте аккаунт. Потом пригласите жену в общий бюджет.' : mode === 'reset' ? 'Введите email, пришлём ссылку для смены пароля.' : 'Сколько можно потратить сегодня — с первого взгляда.'}

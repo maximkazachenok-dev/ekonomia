@@ -1,6 +1,6 @@
 // Шторка создания и редактирования конверта (категории).
 import { html, useState, useEffect } from '../lib/preact.js';
-import { BottomSheet, useApp, ENVELOPE_ICONS, ENVELOPE_COLORS, KIND_LABELS, showToast } from './common.js';
+import { BottomSheet, useApp, ENVELOPE_COLORS, KIND_LABELS, showToast, Mono } from './common.js';
 import { parseAmount, toInputString, currencySymbol, formatMoney } from '../lib/money.js';
 
 export function EnvelopeSheet({ env, onClose }) {
@@ -55,6 +55,13 @@ export function EnvelopeSheet({ env, onClose }) {
 
   return html`<${BottomSheet} open=${true} onClose=${onClose} title=${isNew ? 'Новая категория' : 'Категория'}>
     <form class="form" onSubmit=${submit}>
+      <div class="mono-preview">
+        <${Mono} name=${name} color=${color} size="lg" />
+        <div>
+          <strong class="mono-preview__name">${name.trim() || 'Название'}</strong>
+          <span class="field__hint">Значок складывается из названия сам</span>
+        </div>
+      </div>
       <label class="field">
         <span class="field__label">Название</span>
         <input class="input" value=${name} onInput=${(e) => setName(e.target.value)} placeholder="Например, Аптека" maxlength="24" required />
@@ -83,13 +90,6 @@ export function EnvelopeSheet({ env, onClose }) {
               </div>
               ${kind === 'daily' && kop > 0 && html`<span class="field__hint">≈ ${formatMoney(Math.floor(kop / period.days), family.currency)} в день</span>`}
             </label>`}
-
-      <div class="field">
-        <span class="field__label">Значок</span>
-        <div class="icon-grid">
-          ${ENVELOPE_ICONS.map((i) => html`<button type="button" class=${`icon-pick ${icon === i ? 'icon-pick--active' : ''}`} onClick=${() => setIcon(i)} aria-label=${i}>${i}</button>`)}
-        </div>
-      </div>
 
       <div class="field">
         <span class="field__label">Цвет</span>

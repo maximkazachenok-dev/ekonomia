@@ -3,12 +3,13 @@ import { html, useState, useEffect } from '../lib/preact.js';
 import { BottomSheet, Numpad, useApp } from './common.js';
 import { parseAmount, toInputString, currencySymbol } from '../lib/money.js';
 import { addDays } from '../lib/dates.js';
-import { mainDailyEnvelope, shopName } from '../lib/budget.js';
+import { mainDailyEnvelope, shopName, dailyAllowance, envelopeLimit } from '../lib/budget.js';
+import { formatMoney } from '../lib/money.js';
 
 // opts: { tx } — редактирование; { envelopeId, type } — новая операция
 export function TxSheet({ opts, onClose }) {
   const app = useApp();
-  const { envelopes, envById, today, family, user, shops } = app;
+  const { envelopes, envById, today, family, user, shops, txs, period, plan } = app;
   const editing = opts?.tx || null;
   const presetEnv = editing ? envById[editing.envelopeId] : envById[opts?.envelopeId];
   const isSavings = presetEnv?.kind === 'savings';
@@ -65,6 +66,10 @@ export function TxSheet({ opts, onClose }) {
     } else setEnvelopeId(v.slice(4));
   };
   const others = spendable.filter((e) => editing || e.id !== main?.id);
+  // Подсказка под суммой: сколько останется на сегодня после этой траты
+  const leftAfter = isMainDaily && date === today && kop > 0
+    ? dailyAllowance({ limit: envelopeLimit(main, plan), txs, envelopeId: main.id, today, period }).leftToday - kop
+    : null;
 
   const title = editing
     ? 'Изменить запись'
@@ -79,7 +84,7 @@ export function TxSheet({ opts, onClose }) {
     if (isMainDaily) {
       data.shopId = shopId;
       if (newShop !== null) {
-        data.shopId = sameShop?.id || (await app.saveShop({ name: newName, icon: '🧾', order: Date.now(), archived: false }));
+        data.shopId = sameShop?.id || (await app.saveShop({ name: newName, order: Date.now(), archived: false }));
         if (!data.shopId) return;
       }
     }
@@ -99,18 +104,22 @@ export function TxSheet({ opts, onClose }) {
         <span class="amount-display__value">${amount || '0'}</span>
         <span class="amount-display__cur">${currencySymbol(family.currency)}</span>
       </div>
+      ${leftAfter !== null &&
+      html`<p class=${`tx-left ${leftAfter < 0 ? 'tx-left--over' : ''}`}>
+        ${leftAfter < 0 ? `перерасход за сегодня ${formatMoney(-leftAfter, family.currency, { forceKop: true })}` : `на сегодня останется ${formatMoney(leftAfter, family.currency, { forceKop: true })}`}
+      </p>`}
 
       ${!isSavings &&
       html`<select class="input tx-select" value=${where} onChange=${(e) => pick(e.target.value)} aria-label="На что потрачено">
         ${!editing &&
         main &&
         html`<optgroup label=${`Из дневного лимита — «${main.name}»`}>
-          ${activeShops.map((s) => html`<option value=${`shop:${s.id}`}>${s.icon || '🏪'} ${shopName(s)}</option>`)}
+          ${activeShops.map((s) => html`<option value=${`shop:${s.id}`}>${shopName(s)}</option>`)}
           <option value="new">＋ Новый раздел (например, Столовая)…</option>
         </optgroup>`}
         ${others.length > 0 &&
         html`<optgroup label=${editing ? 'Категории' : 'Отдельные категории'}>
-          ${others.map((e) => html`<option value=${`env:${e.id}`}>${e.icon} ${e.name}</option>`)}
+          ${others.map((e) => html`<option value=${`env:${e.id}`}>${e.name}</option>`)}
         </optgroup>`}
       </select>`}
 

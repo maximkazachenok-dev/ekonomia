@@ -1,5 +1,5 @@
 import { html, useState, useMemo } from '../lib/preact.js';
-import { useApp, Money } from '../ui/common.js';
+import { useApp, Money, Mono } from '../ui/common.js';
 import { relativeDay, formatDay } from '../lib/dates.js';
 import { shopName } from '../lib/budget.js';
 
@@ -21,7 +21,7 @@ export function TxRow({ tx, showDate = false }) {
   ].filter(Boolean);
   return html`<li>
     <button class="tx-row" onClick=${() => openTx({ tx })}>
-      <span class="env-row__icon" style=${{ background: env.color + '22' }}>${shop ? shop.icon || '🏪' : env.icon}</span>
+      <${Mono} name=${shop ? shopName(shop) : env.name} color=${shop ? undefined : env.color} />
       <span class="tx-row__main">
         <span class="tx-row__name">${title}</span>
         <span class="tx-row__meta muted">
@@ -73,12 +73,12 @@ export function HistoryScreen() {
       <button class=${`chip chip--small ${envFilter === 'all' ? 'chip--active' : ''}`} onClick=${() => setEnvFilter('all')}>Все</button>
       ${used.map(
         (e) => html`<button class=${`chip chip--small ${envFilter === e.id ? 'chip--active' : ''}`} style=${{ '--chip': e.color }} onClick=${() => setEnvFilter(e.id)}>
-          <span class="chip__icon">${e.icon}</span>${e.name}
+          ${e.name}
         </button>`,
       )}
       ${usedShops.map(
         (s) => html`<button class=${`chip chip--small ${envFilter === `shop:${s.id}` ? 'chip--active' : ''}`} onClick=${() => setEnvFilter(`shop:${s.id}`)}>
-          <span class="chip__icon">${s.icon || '🏪'}</span>${shopName(s)}
+          ${shopName(s)}
         </button>`,
       )}
     </div>

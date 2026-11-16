@@ -47,7 +47,7 @@ const TABS = [
 ];
 
 function Splash() {
-  return html`<div class="splash"><div class="onb__logo">💰</div></div>`;
+  return html`<div class="splash"><img class="onb__logo" src="icons/app-192.png" alt="" /></div>`;
 }
 
 function Budget({ backend, user, fid }) {
@@ -118,7 +118,7 @@ function Budget({ backend, user, fid }) {
       if (silent) return;
       const env = envById[tx.envelopeId];
       const shop = tx.shopId && shopById[tx.shopId];
-      const where = shop ? `${shop.icon || '🏪'} ${shopName(shop)}` : `${env.icon} ${env.name}`;
+      const where = shop ? shopName(shop) : env.name;
       p.then((id) =>
         showToast(`${formatMoney(tx.amount, family.currency)} · ${where}`, {
           label: 'Отменить',
@@ -293,19 +293,20 @@ function Budget({ backend, user, fid }) {
       <${Screen} />
     </main>
 
-    ${(tab === 'home' || tab === 'history') &&
-    hasSpendable &&
-    html`<button class="fab" onClick=${() => setTxOpts({})} aria-label="Добавить трату">${Icon.plus}</button>`}
-    ${tab === 'shops' &&
-    mainDailyEnvelope(envelopes) &&
-    html`<button class="fab" onClick=${() => setPurchaseOpts({ shopId: openShopId || 'other' })} aria-label="Добавить покупку">${Icon.plus}</button>`}
-
     <nav class="tabbar">
-      ${TABS.map(
-        (t) => html`<button class=${`tabbar__btn ${tab === t.id ? 'tabbar__btn--active' : ''}`} onClick=${() => { setTab(t.id); window.scrollTo(0, 0); }} aria-current=${tab === t.id ? 'page' : undefined}>
-          ${t.icon}<span>${t.label}</span>
-        </button>`,
-      )}
+      <div class="tabbar__pill">
+        ${TABS.map(
+          (t) => html`<button class=${`tabbar__btn ${tab === t.id ? 'tabbar__btn--active' : ''}`} onClick=${() => { setTab(t.id); window.scrollTo(0, 0); }} aria-current=${tab === t.id ? 'page' : undefined}>
+            ${t.icon}<span>${t.label}</span>
+          </button>`,
+        )}
+      </div>
+      ${(tab === 'home' || tab === 'history') &&
+      hasSpendable &&
+      html`<button class="fab" onClick=${() => setTxOpts({})} aria-label="Добавить трату">${Icon.plus}</button>`}
+      ${tab === 'shops' &&
+      mainDailyEnvelope(envelopes) &&
+      html`<button class="fab" onClick=${() => setPurchaseOpts({ shopId: openShopId || 'other' })} aria-label="Добавить покупку">${Icon.plus}</button>`}
     </nav>
 
     <${TxSheet} opts=${txOpts} onClose=${() => setTxOpts(null)} />
@@ -353,6 +354,32 @@ function App() {
 
   return html`${content}<${Toasts} />`;
 }
+
+// Отклик на нажатие: кнопка «проседает», даже если палец коснулся её на мгновение.
+// Небольшая задержка — чтобы строки списка не мигали при прокрутке.
+document.addEventListener(
+  'pointerdown',
+  (e) => {
+    const el = e.target.closest?.('button, .btn, select');
+    if (!el || el.disabled) return;
+    let on = false;
+    const press = () => {
+      on = true;
+      el.dataset.pressed = '';
+    };
+    const timer = setTimeout(press, 60);
+    const done = (ev) => {
+      clearTimeout(timer);
+      window.removeEventListener('pointerup', done);
+      window.removeEventListener('pointercancel', done);
+      if (ev.type === 'pointerup' && !on) press();
+      setTimeout(() => delete el.dataset.pressed, on && ev.type === 'pointerup' ? 140 : 0);
+    };
+    window.addEventListener('pointerup', done);
+    window.addEventListener('pointercancel', done);
+  },
+  { passive: true },
+);
 
 window.__appStarted = true;
 render(html`<${App} />`, document.getElementById('root'));

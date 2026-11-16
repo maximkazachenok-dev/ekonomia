@@ -24,7 +24,7 @@
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js" crossorigin />
   </head>
   <body>
-    <div id="root"><div class="splash"><div class="onb__logo">💰</div></div></div>
+    <div id="root"><div class="splash"><img class="onb__logo" src="icons/app-192.png" alt="" /></div></div>
     <noscript>Для работы приложения нужен JavaScript.</noscript>
     <script type="module" src="js/app.js"></script>
     <script>
@@ -32,7 +32,7 @@
       setTimeout(function () {
         if (window.__appStarted) return;
         document.getElementById('root').innerHTML =
-          '<div class="onb" style="justify-content:center;text-align:center"><div class="onb__logo">📶</div>' +
+          '<div class="onb" style="justify-content:center;text-align:center">' +
           '<p class="onb__text">Не удалось загрузить приложение. Проверьте интернет.</p>' +
           '<button class="btn btn--primary btn--block btn--lg" onclick="location.reload()">Обновить</button></div>';
       }, 8000);

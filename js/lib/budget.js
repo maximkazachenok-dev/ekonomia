@@ -310,3 +310,12 @@ export function statsTotals(stats, today) {
     since: planned.length ? planned[planned.length - 1].period.start : null,
   };
 }
+
+// ── Значок-монограмма ──
+// Две буквы из названия вместо картинки: «Топливо» → «То», «Ремонт авто» → «Ра».
+export function monogram(name) {
+  const words = String(name || '').replace(/[«»"'()]/g, ' ').split(/[\s\-–—.,/]+/).filter((w) => w && !/^(и|в|на|для|по|с)$/i.test(w));
+  if (!words.length) return '•';
+  const chars = words.length > 1 ? [words[0][0], words[1][0]] : [...words[0]].slice(0, 2);
+  return chars[0].toUpperCase() + (chars[1] || '').toLowerCase();
+}
