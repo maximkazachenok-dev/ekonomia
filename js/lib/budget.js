@@ -225,15 +225,51 @@ export function allocate(plan, envelopeId, amount) {
   const mandatory = { ...plan.mandatory };
   if (amount > 0) mandatory[envelopeId] = amount;
   else delete mandatory[envelopeId];
-  return withFree({ ...plan, mandatory });
+  // Сумма задана статье целиком — разбивка по подразделам больше не действует
+  const subAlloc = { ...(plan.subAlloc || {}) };
+  delete subAlloc[envelopeId];
+  return withFree({ ...plan, mandatory, subAlloc });
+}
+
+// ── Подразделы статьи (Коммуналка → свет, вода, газ) ──
+// Подразделы хранятся в конверте (env.subs), суммы — в плане: subAlloc[envelopeId][subId].
+// Сумма статьи (mandatory) = сумма подразделов, поэтому остальные формулы их не замечают.
+export const activeSubs = (env) => (env?.subs || []).filter((s) => !s.archived);
+
+export function allocateSubs(plan, envelopeId, amounts) {
+  const clean = Object.fromEntries(Object.entries(amounts).filter(([, v]) => v > 0));
+  const total = Object.values(clean).reduce((s, v) => s + v, 0);
+  const next = allocate(plan, envelopeId, total);
+  if (total > 0) next.subAlloc = { ...next.subAlloc, [envelopeId]: clean };
+  return next;
+}
+
+// Траты подраздела за период; subId = null — траты статьи без подраздела.
+export function subSpent(txs, envelopeId, subId, period) {
+  let s = 0;
+  for (const t of txs) {
+    if (t.envelopeId !== envelopeId || t.type !== 'expense' || (t.subId || null) !== subId) continue;
+    if (t.date < period.start || t.date >= period.end) continue;
+    s += t.amount;
+  }
+  return s;
 }
 
 // «Как в прошлом месяце»: суммы прошлого периода для категорий, которые ещё не распределены.
+// У статьи с подразделами переносятся и суммы подразделов, которые ещё существуют.
 export function allocationsFromPrevious(plan, prevPlan, envelopes) {
   if (!prevPlan) return [];
   return mandatoryEnvelopes(envelopes)
     .filter((e) => prevPlan.mandatory?.[e.id] > 0 && !(e.id in plan.mandatory))
-    .map((e) => ({ envelope: e, amount: prevPlan.mandatory[e.id] }));
+    .map((e) => {
+      const prevSubs = prevPlan.subAlloc?.[e.id];
+      const ids = new Set(activeSubs(e).map((s) => s.id));
+      const subs = prevSubs ? Object.fromEntries(Object.entries(prevSubs).filter(([id]) => ids.has(id))) : null;
+      if (subs && Object.keys(subs).length) {
+        return { envelope: e, amount: Object.values(subs).reduce((s, v) => s + v, 0), subs };
+      }
+      return { envelope: e, amount: prevPlan.mandatory[e.id] };
+    });
 }
 
 // Категорию скрыли посреди периода — её распределение возвращается в свободные деньги.

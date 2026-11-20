@@ -3,18 +3,25 @@
 import { html, useState, useEffect } from '../lib/preact.js';
 import { BottomSheet, Numpad, useApp, Money } from './common.js';
 import { parseAmount, toInputString, currencySymbol, formatMoney } from '../lib/money.js';
-import { allocate, mainDailyEnvelope, dailyAllowance } from '../lib/budget.js';
+import { allocate, allocateSubs, activeSubs, mainDailyEnvelope, dailyAllowance } from '../lib/budget.js';
 
 export function AllocateSheet({ env, onClose }) {
-  const { plan, prevPlan, period, family, allocateTo, envelopes, txs, today } = useApp();
+  const { plan, prevPlan, period, family, allocateTo, allocateSubsTo, envelopes, txs, today, envById } = useApp();
   const [amount, setAmount] = useState('');
+  const [subAmounts, setSubAmounts] = useState({});
   const current = (env && plan?.mandatory[env.id]) || 0;
+  // Подразделы берём из свежих данных конверта (новый конверт приходит сюда без них)
+  const subs = env && env.kind !== 'savings' ? activeSubs(envById[env.id] || env) : [];
 
   useEffect(() => {
-    if (env) setAmount(toInputString(current));
+    if (!env) return;
+    setAmount(toInputString(current));
+    const saved = plan?.subAlloc?.[env.id] || {};
+    setSubAmounts(Object.fromEntries(Object.entries(saved).map(([id, v]) => [id, toInputString(v)])));
   }, [env]);
 
   if (!env || !plan) return null;
+  if (subs.length) return html`<${SubsAllocate} env=${env} subs=${subs} values=${subAmounts} setValues=${setSubAmounts} onClose=${onClose} />`;
 
   const cur = family.currency;
   const kop = parseAmount(amount || '0');
@@ -67,6 +74,54 @@ export function AllocateSheet({ env, onClose }) {
       <div class="tx-actions">
         ${current > 0 && html`<button type="button" class="btn btn--danger-ghost" onClick=${() => save(0)}>Убрать</button>`}
         <button type="button" class="btn btn--primary btn--grow" disabled=${!valid || kop === current} onClick=${() => save(kop)}>
+          ${current > 0 ? 'Сохранить' : 'Распределить'}
+        </button>
+      </div>
+    </div>
+  <//>`;
+}
+
+// Статья с подразделами: сумма на каждый подраздел, сумма статьи складывается сама.
+function SubsAllocate({ env, subs, values, setValues, onClose }) {
+  const { plan, prevPlan, family, allocateSubsTo } = useApp();
+  const cur = family.currency;
+  const kops = Object.fromEntries(subs.map((s) => [s.id, parseAmount(values[s.id] || '0')]));
+  const invalid = Object.values(kops).some((v) => Number.isNaN(v));
+  const total = invalid ? 0 : Object.values(kops).reduce((s, v) => s + v, 0);
+  const current = plan.mandatory[env.id] || 0;
+  const after = invalid ? plan : allocateSubs(plan, env.id, kops);
+  const prev = prevPlan?.subAlloc?.[env.id] || {};
+
+  const save = () => {
+    allocateSubsTo(env, kops);
+    onClose();
+  };
+
+  return html`<${BottomSheet} open=${true} onClose=${onClose} title=${env.name}>
+    <div class="form">
+      <ul class="subs-alloc">
+        ${subs.map(
+          (s) => html`<li key=${s.id}>
+            <label class="subs-alloc__name" for=${`sub-${s.id}`}>${s.name}
+              ${prev[s.id] > 0 && html`<button type="button" class="link-btn subs-alloc__prev" onClick=${() => setValues({ ...values, [s.id]: toInputString(prev[s.id]) })}>было ${formatMoney(prev[s.id], cur)}</button>`}
+            </label>
+            <div class="input-money">
+              <input id=${`sub-${s.id}`} class="input" inputmode="decimal" value=${values[s.id] || ''} placeholder="0"
+                onInput=${(e) => setValues({ ...values, [s.id]: e.target.value })} />
+              <span>${currencySymbol(cur)}</span>
+            </div>
+          </li>`,
+        )}
+      </ul>
+      ${invalid && html`<p class="form-error">Проверьте суммы: допустимы цифры и запятая</p>`}
+      <div class=${`plan-result ${after.free < 0 ? 'plan-result--bad' : ''}`}>
+        <div class="plan-result__row"><span>Итого на «${env.name}»</span><${Money} kop=${total} /></div>
+        <div class="plan-result__row plan-result__row--total"><span>Останется свободно</span><${Money} kop=${after.free} /></div>
+        ${after.free < 0 && html`<p class="plan-result__note">Распределено больше дохода на ${formatMoney(-after.free, cur)}</p>`}
+      </div>
+      <div class="tx-actions">
+        ${current > 0 && html`<button type="button" class="btn btn--danger-ghost" onClick=${() => { allocateSubsTo(env, {}); onClose(); }}>Убрать</button>`}
+        <button type="button" class="btn btn--primary btn--grow" disabled=${invalid || (total === 0 && current === 0)} onClick=${save}>
           ${current > 0 ? 'Сохранить' : 'Распределить'}
         </button>
       </div>

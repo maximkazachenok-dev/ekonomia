@@ -1,6 +1,6 @@
 import { html } from '../lib/preact.js';
 import { useApp, Money, ProgressBar, Icon, Mono } from '../ui/common.js';
-import { dailyAllowance, envelopeProgress, savingsProgress, envelopeLimit, mandatoryEnvelopes, allocationsFromPrevious, periodStats } from '../lib/budget.js';
+import { dailyAllowance, envelopeProgress, savingsProgress, envelopeLimit, mandatoryEnvelopes, allocationsFromPrevious, periodStats, activeSubs, subSpent } from '../lib/budget.js';
 import { formatDay, pluralDays, addDays, daysBetween, parseISO } from '../lib/dates.js';
 import { formatMoney } from '../lib/money.js';
 import { TxRow } from './history.js';
@@ -50,7 +50,7 @@ function DailyCard({ env, hero }) {
           ? html`потрачено <${Money} kop=${d.spentToday} /> из <${Money} kop=${Math.max(0, d.todayLimit)} /> на сегодня`
           : html`это лимит на сегодня`}
       </div>
-      ${!hero && html`<${ProgressBar} percent=${usedPct} status=${d.status} />`}
+      <${ProgressBar} percent=${usedPct} status=${d.status} />
     </button>
     ${hero && html`<${PeriodRuler} period=${period} today=${today} daysLeft=${d.daysLeft} />`}
     <dl class="daily__stats">
@@ -124,6 +124,16 @@ function AllocationCard() {
               </span>
               ${p && html`<${ProgressBar} percent=${p.percent} status=${p.status} thin />
                 <span class="env-row__sub muted">${p.left < 0 ? html`перерасход <${Money} kop=${-p.left} />` : html`потрачено <${Money} kop=${p.spent} />, осталось <${Money} kop=${p.left} />`}</span>`}
+              ${amount > 0 && plan.subAlloc?.[e.id] &&
+              html`<span class="sub-lines">
+                ${activeSubs(e).filter((s) => plan.subAlloc[e.id][s.id] > 0 || subSpent(txs, e.id, s.id, period) > 0).map((s) => {
+                  const planned = plan.subAlloc[e.id][s.id] || 0;
+                  const spent = subSpent(txs, e.id, s.id, period);
+                  return html`<span class=${`sub-line ${spent > planned ? 'sub-line--over' : ''}`}>
+                    <span>${s.name}</span><span><${Money} kop=${spent} /> из <${Money} kop=${planned} /></span>
+                  </span>`;
+                })}
+              </span>`}
               ${e.kind === 'savings' && amount > 0 &&
               (notDeposited
                 ? html`<span class="env-row__sub env-row__sub--warn">в копилку пока не попало</span>`

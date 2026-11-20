@@ -18,6 +18,7 @@
       globalThis.__testResult = (passed, failed) => (document.title = failed ? `✗ ${failed}` : `✓ ${passed}`);
       await import('./budget.test.js');
       await import('./voice.test.js');
+      await import('./receipt.test.js');
     </script>
   </body>
 </html>

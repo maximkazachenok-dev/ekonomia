@@ -26,11 +26,13 @@ export function TxSheet({ opts, onClose }) {
   const [shopId, setShopId] = useState('other');
   // Новый раздел дневных расходов («Столовая») создаётся прямо здесь, вместе с тратой
   const [newShop, setNewShop] = useState(null);
+  const [subId, setSubId] = useState('');
 
   useEffect(() => {
     if (!opts) return;
     setShopId('other');
     setNewShop(null);
+    setSubId(editing?.subId || '');
     setAmount(editing ? toInputString(editing.amount) : '');
     setEnvelopeId(defaultEnv);
     setType(editing?.type || opts.type || 'expense');
@@ -66,6 +68,8 @@ export function TxSheet({ opts, onClose }) {
     } else setEnvelopeId(v.slice(4));
   };
   const others = spendable.filter((e) => editing || e.id !== main?.id);
+  // Подразделы выбранной статьи (+ подраздел правимой траты, даже если его потом скрыли)
+  const envSubs = !isSavings && env ? (env.subs || []).filter((s) => !s.archived || s.id === subId) : [];
   // Подсказка под суммой: сколько останется на сегодня после этой траты
   const leftAfter = isMainDaily && date === today && kop > 0
     ? dailyAllowance({ limit: envelopeLimit(main, plan), txs, envelopeId: main.id, today, period }).leftToday - kop
@@ -81,6 +85,7 @@ export function TxSheet({ opts, onClose }) {
     e?.preventDefault();
     if (!valid) return;
     const data = { amount: kop, envelopeId, type, note: note.trim(), date };
+    if (envSubs.length) data.subId = envSubs.some((s) => s.id === subId) ? subId : null;
     if (isMainDaily) {
       data.shopId = shopId;
       if (newShop !== null) {
@@ -121,6 +126,12 @@ export function TxSheet({ opts, onClose }) {
         html`<optgroup label=${editing ? 'Категории' : 'Отдельные категории'}>
           ${others.map((e) => html`<option value=${`env:${e.id}`}>${e.name}</option>`)}
         </optgroup>`}
+      </select>`}
+
+      ${envSubs.length > 0 &&
+      html`<select class="input tx-select" value=${envSubs.some((s) => s.id === subId) ? subId : ''} onChange=${(e) => setSubId(e.target.value)} aria-label="Подраздел">
+        <option value="">Без подраздела</option>
+        ${envSubs.map((s) => html`<option value=${s.id}>${s.name}</option>`)}
       </select>`}
 
       ${newShop !== null &&

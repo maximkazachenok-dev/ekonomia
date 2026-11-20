@@ -1,6 +1,6 @@
 // Шторка создания и редактирования конверта (категории).
 import { html, useState, useEffect } from '../lib/preact.js';
-import { BottomSheet, useApp, ENVELOPE_COLORS, KIND_LABELS, showToast, Mono } from './common.js';
+import { BottomSheet, useApp, ENVELOPE_COLORS, KIND_LABELS, showToast, Mono, Icon } from './common.js';
 import { parseAmount, toInputString, currencySymbol, formatMoney } from '../lib/money.js';
 
 export function EnvelopeSheet({ env, onClose }) {
@@ -11,6 +11,9 @@ export function EnvelopeSheet({ env, onClose }) {
   const [color, setColor] = useState(ENVELOPE_COLORS[0]);
   const [kind, setKind] = useState('period');
   const [amount, setAmount] = useState('');
+  // Подразделы (свет, вода, газ): удалённые не стираются, а скрываются — траты в них остаются в истории
+  const [subs, setSubs] = useState([]);
+  const [subName, setSubName] = useState('');
 
   useEffect(() => {
     if (!env) return;
@@ -20,6 +23,8 @@ export function EnvelopeSheet({ env, onClose }) {
     setColor(env.color || ENVELOPE_COLORS[envelopes.length % ENVELOPE_COLORS.length]);
     setKind(k);
     setAmount(toInputString(k === 'savings' ? env.goal : env.limit));
+    setSubs(env.subs || []);
+    setSubName('');
   }, [env]);
 
   if (!env) return null;
@@ -33,10 +38,29 @@ export function EnvelopeSheet({ env, onClose }) {
   const byAllocation = plan && !fromIncome && kind !== 'savings';
   const allocatedNow = (plan && env.id && plan.mandatory[env.id]) || 0;
 
+  const visibleSubs = subs.filter((s) => !s.archived);
+  const canHaveSubs = kind === 'period' && !fromIncome;
+  const addSub = () => {
+    const n = subName.trim();
+    if (!n) return;
+    const same = subs.find((s) => s.name.toLowerCase() === n.toLowerCase());
+    if (same) setSubs(subs.map((s) => (s === same ? { ...s, archived: false } : s)));
+    else setSubs([...subs, { id: Math.random().toString(36).slice(2, 10), name: n }]);
+    setSubName('');
+  };
+  const removeSub = (id) => setSubs(subs.map((s) => (s.id === id ? { ...s, archived: true } : s)));
+
   const submit = async (e) => {
     e.preventDefault();
     if (!valid) return;
     const data = { name: name.trim(), icon, color, kind };
+    if (canHaveSubs) {
+      // Название, введённое, но не добавленное кнопкой, тоже сохраняем
+      const pendingName = subName.trim();
+      data.subs = pendingName && !subs.some((s) => s.name.toLowerCase() === pendingName.toLowerCase())
+        ? [...subs, { id: Math.random().toString(36).slice(2, 10), name: pendingName }]
+        : subs;
+    }
     if (kind === 'savings') data.goal = kop;
     else if (!fromIncome && !byAllocation) data.limit = kop;
     if (isNew) data.order = envelopes.length;
@@ -90,6 +114,26 @@ export function EnvelopeSheet({ env, onClose }) {
               </div>
               ${kind === 'daily' && kop > 0 && html`<span class="field__hint">≈ ${formatMoney(Math.floor(kop / period.days), family.currency)} в день</span>`}
             </label>`}
+
+      ${canHaveSubs &&
+      html`<div class="field">
+        <span class="field__label">Подразделы</span>
+        ${visibleSubs.length > 0 &&
+        html`<ul class="subs-edit">
+          ${visibleSubs.map(
+            (s) => html`<li key=${s.id}>
+              <span>${s.name}</span>
+              <button type="button" class="icon-btn icon-btn--close" onClick=${() => removeSub(s.id)} aria-label=${`Убрать подраздел «${s.name}»`}>${Icon.close}</button>
+            </li>`,
+          )}
+        </ul>`}
+        <div class="subs-add">
+          <input class="input" value=${subName} onInput=${(e) => setSubName(e.target.value)} placeholder=${visibleSubs.length ? 'Ещё подраздел' : 'Например: свет, вода, газ'} maxlength="24"
+            onKeyDown=${(e) => { if (e.key === 'Enter') { e.preventDefault(); addSub(); } }} aria-label="Название подраздела" />
+          <button type="button" class="btn btn--ghost" onClick=${addSub} disabled=${!subName.trim()}>Добавить</button>
+        </div>
+        <span class="field__hint">Необязательно. С подразделами сумма статьи складывается из сумм подразделов, а трату можно записать в подраздел.</span>
+      </div>`}
 
       <div class="field">
         <span class="field__label">Цвет</span>

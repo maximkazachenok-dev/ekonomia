@@ -18,7 +18,7 @@ import { LoginScreen } from './screens/login.js';
 import { createBackend, balanceChangesFor } from './data/store.js';
 import {
   getPeriod, previousPeriod, periodSummary, applyEnvelopeToPlan, mainDailyEnvelope, DEFAULT_SHOPS, shopName,
-  newPlan, withIncome, allocate, allocationsFromPrevious,
+  newPlan, withIncome, allocate, allocationsFromPrevious, allocateSubs,
 } from './lib/budget.js';
 import { todayISO, formatDay } from './lib/dates.js';
 import { formatMoney } from './lib/money.js';
@@ -215,13 +215,16 @@ function Budget({ backend, user, fid }) {
     savePlan(next);
   };
 
+  // Статья с подразделами: суммы по каждому, сумма статьи складывается сама.
+  const allocateSubsTo = (env, amounts) => savePlan(allocateSubs(plan, env.id, amounts));
+
   // «Как в прошлом месяце»: те же суммы на ещё не распределённые категории.
   const repeatPrevious = async () => {
     const list = allocationsFromPrevious(plan, prevPlan, envelopes);
     let next = plan;
     const savingsTx = { ...(plan.savingsTx || {}) };
-    for (const { envelope, amount } of list) {
-      next = allocate(next, envelope.id, amount);
+    for (const { envelope, amount, subs } of list) {
+      next = subs ? allocateSubs(next, envelope.id, subs) : allocate(next, envelope.id, amount);
       if (envelope.kind === 'savings') {
         const id = await savingsDeposit(envelope, amount, null).catch((e) => showToast(e.message));
         if (id) savingsTx[envelope.id] = id;
@@ -276,6 +279,7 @@ function Budget({ backend, user, fid }) {
     saveIncome,
     deleteIncome,
     allocateTo,
+    allocateSubsTo,
     repeatPrevious,
     openAllocate: setAllocEnv,
     addTx,

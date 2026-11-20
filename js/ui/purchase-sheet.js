@@ -5,6 +5,7 @@ import { BottomSheet, useApp, Money, Icon } from './common.js';
 import { parseAmount, toInputString, currencySymbol } from '../lib/money.js';
 import { addDays } from '../lib/dates.js';
 import { mainDailyEnvelope, shopName, itemSuggestions, lastPrice, priceChange } from '../lib/budget.js';
+import { parseReceipt } from '../lib/receipt-parse.js';
 
 const emptyRow = () => ({ name: '', price: '' });
 
@@ -21,6 +22,10 @@ export function PurchaseSheet({ opts, onClose }) {
   const [onlyTotal, setOnlyTotal] = useState(false);
   const [total, setTotal] = useState('');
   const [guessDone, setGuessDone] = useState(false);
+  // Чек: текст, считанный камерой iPhone («Сканировать текст»), и предупреждения разбора
+  const [receiptOpen, setReceiptOpen] = useState(false);
+  const [receiptText, setReceiptText] = useState('');
+  const [receiptNotes, setReceiptNotes] = useState(null);
 
   const suggestions = useMemo(() => itemSuggestions(txs), [txs]);
   const names = useMemo(() => [...suggestions.values()].map((s) => s.name), [suggestions]);
@@ -39,6 +44,9 @@ export function PurchaseSheet({ opts, onClose }) {
     setOnlyTotal(totalOnly);
     setTotal(editing && !items.length ? toInputString(editing.amount) : opts.draft?.total ? toInputString(opts.draft.total) : '');
     setGuessDone(false);
+    setReceiptOpen(false);
+    setReceiptText('');
+    setReceiptNotes(null);
   }, [opts]);
 
   if (!opts) return null;
@@ -76,6 +84,15 @@ export function PurchaseSheet({ opts, onClose }) {
     return html`<span class=${`item-row__hint ${up ? 'item-row__hint--up' : 'item-row__hint--down'}`}>
       ${up ? `↑ подорожало на ${change}%` : `↓ подешевело на ${-change}%`} · было <${Money} kop=${prev} forceKop=${prev % 100 !== 0} />
     </span>`;
+  };
+  const readReceipt = () => {
+    const r = parseReceipt(receiptText);
+    if (r.items.length) {
+      setOnlyTotal(false);
+      setRows(r.items.map((it) => ({ name: it.name, price: toInputString(it.amount) })));
+      setReceiptOpen(false);
+    }
+    setReceiptNotes(r.warnings);
   };
   const removeRow = (i) => setRows(rows.length > 1 ? rows.filter((_, j) => j !== i) : [emptyRow()]);
 
@@ -122,6 +139,30 @@ export function PurchaseSheet({ opts, onClose }) {
         })}
         <input class="input input--date" type="date" value=${date} max=${today} onInput=${(e) => e.target.value && setDate(e.target.value)} aria-label="Дата покупки" />
       </div>
+
+      ${!editing &&
+      (receiptOpen
+        ? html`<div class="receipt">
+            <label class="field">
+              <span class="field__label">Текст чека</span>
+              <textarea class="input receipt__text" rows="5" value=${receiptText} onInput=${(e) => setReceiptText(e.target.value)}
+                placeholder="Нажмите сюда и выберите «Сканировать текст»"></textarea>
+            </label>
+            <ol class="receipt__steps">
+              <li>Нажмите на поле выше → <strong>«Сканировать текст»</strong> (значок рамки с текстом над клавиатурой или в меню «Вставить»).</li>
+              <li>Наведите камеру на чек целиком, сверху вниз, и нажмите <strong>«Вставить»</strong>.</li>
+              <li>Или: сфотографируйте чек камерой, откройте фото, нажмите и удерживайте текст → «Выбрать все» → «Скопировать», вставьте сюда.</li>
+            </ol>
+            <div class="tx-actions">
+              <button type="button" class="btn btn--ghost" onClick=${() => setReceiptOpen(false)}>Отмена</button>
+              <button type="button" class="btn btn--primary btn--grow" disabled=${!receiptText.trim()} onClick=${readReceipt}>Разобрать чек</button>
+            </div>
+          </div>`
+        : html`<button type="button" class="btn btn--ghost btn--block" onClick=${() => { setReceiptOpen(true); setReceiptNotes(null); }}>${Icon.receipt} Из чека камерой</button>`)}
+      ${receiptNotes?.length > 0 &&
+      html`<div class="notice notice--warn" role="alert">
+        <div>${receiptNotes.map((n) => html`<p>${n}</p>`)}</div>
+      </div>`}
 
       ${onlyTotal
         ? html`<label class="field">

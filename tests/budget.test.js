@@ -3,7 +3,7 @@ import {
   getPeriod, previousPeriod, dailyAllowance, envelopeProgress, periodSummary, sumExpenses,
   mainDailyEnvelope, mandatoryEnvelopes, planPeriod, newPlan, withIncome, allocate, allocationsFromPrevious, applyEnvelopeToPlan, envelopeLimit,
   itemsTotal, shopTotals, itemSuggestions, lastPrice, shopName, priceChange, priceList,
-  periodsSince, periodStats, statsTotals, monogram,
+  periodsSince, periodStats, statsTotals, monogram, allocateSubs, subSpent, activeSubs,
 } from '../js/lib/budget.js';
 import { parseAmount, formatAmount, toInputString } from '../js/lib/money.js';
 import { pluralDays, addDays, daysBetween } from '../js/lib/dates.js';
@@ -254,6 +254,25 @@ eq(monogram('ремонт авто'), 'Ра', 'значок: два слова �
 eq(monogram('Бытовая химия и гигиена'), 'Бх', 'значок: союз «и» не считается словом');
 eq(monogram(' Я '), 'Я', 'значок: одна буква');
 eq(monogram(''), '•', 'значок: пустое название');
+
+// ── Подразделы статей ──
+const util = { id: 'util', kind: 'period', name: 'Коммуналка', subs: [{ id: 'light', name: 'Свет' }, { id: 'water', name: 'Вода' }, { id: 'gas', name: 'Газ', archived: true }] };
+eq(activeSubs(util).map((s) => s.id), ['light', 'water'], 'подразделы: скрытый не показывается');
+const p0 = newPlan({ income: 100000, envelopes: [{ id: 'main', kind: 'daily' }, util] });
+const p1 = allocateSubs(p0, 'util', { light: 4000, water: 2500, gas: 0 });
+eq([p1.mandatory.util, p1.subAlloc.util, p1.free], [6500, { light: 4000, water: 2500 }, 93500], 'подразделы: сумма статьи = сумма подразделов, свободно уменьшилось');
+const p2 = allocate(p1, 'util', 7000);
+eq([p2.mandatory.util, p2.subAlloc.util], [7000, undefined], 'сумма статьи целиком — разбивка по подразделам снимается');
+const p3 = allocateSubs(p1, 'util', { light: 0, water: 0 });
+eq(['util' in p3.mandatory, p3.subAlloc.util, p3.free], [false, undefined, 100000], 'все подразделы по нулям — статья убрана');
+const prevSubs = allocationsFromPrevious(p0, p1, [{ id: 'main', kind: 'daily' }, util]);
+eq(prevSubs.map((a) => [a.envelope.id, a.amount, a.subs]), [['util', 6500, { light: 4000, water: 2500 }]], '«как в прошлом месяце» переносит суммы подразделов');
+const subTxs = [
+  { date: '2026-10-12', envelopeId: 'util', type: 'expense', amount: 3500, subId: 'light' },
+  { date: '2026-10-13', envelopeId: 'util', type: 'expense', amount: 1000 },
+  { date: '2026-09-13', envelopeId: 'util', type: 'expense', amount: 900, subId: 'light' },
+];
+eq([subSpent(subTxs, 'util', 'light', period), subSpent(subTxs, 'util', null, period)], [3500, 1000], 'траты подраздела и траты без подраздела за период');
 
 out(`\n${failed ? '✗' : '✓'} Пройдено: ${passed}, упало: ${failed}`);
 if (typeof globalThis.__testResult === 'function') globalThis.__testResult(passed, failed);

@@ -15,6 +15,7 @@ export function TxRow({ tx, showDate = false }) {
   // Покупка в разделе: «Гиппо» и список товаров; обычная трата: заметка или конверт
   const title = shop ? shopName(shop) : tx.note || env.name;
   const meta = [
+    tx.subId ? (env.subs || []).find((s) => s.id === tx.subId)?.name : '',
     tx.items?.length ? tx.items.map((it) => it.name).join(', ') : shop ? tx.note : tx.note ? env.name : '',
     multi ? who : '',
     showDate ? formatDay(tx.date, { short: true }) : '',
