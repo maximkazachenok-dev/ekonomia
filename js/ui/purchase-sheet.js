@@ -85,14 +85,26 @@ export function PurchaseSheet({ opts, onClose }) {
       ${up ? `↑ подорожало на ${change}%` : `↓ подешевело на ${-change}%`} · было <${Money} kop=${prev} forceKop=${prev % 100 !== 0} />
     </span>`;
   };
-  const readReceipt = () => {
-    const r = parseReceipt(receiptText);
+  const readReceipt = (text = receiptText) => {
+    const r = parseReceipt(text);
     if (r.items.length) {
       setOnlyTotal(false);
       setRows(r.items.map((it) => ({ name: it.name, price: toInputString(it.amount) })));
       setReceiptOpen(false);
     }
     setReceiptNotes(r.warnings);
+  };
+  // Текст чека, скопированный в Камере iPhone («Живой текст» → «Скопировать»): берём из буфера обмена.
+  // iPhone покажет над кнопкой «Вставить» — его нужно нажать. Не вышло — вставляют в поле вручную.
+  const pasteReceipt = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (!text.trim()) throw new Error('empty');
+      setReceiptText(text);
+      readReceipt(text);
+    } catch {
+      setReceiptNotes(['Не удалось взять текст из буфера. Скопируйте текст чека в Камере, затем нажмите и удерживайте поле ниже → «Вставить».']);
+    }
   };
   const removeRow = (i) => setRows(rows.length > 1 ? rows.filter((_, j) => j !== i) : [emptyRow()]);
 
@@ -143,22 +155,24 @@ export function PurchaseSheet({ opts, onClose }) {
       ${!editing &&
       (receiptOpen
         ? html`<div class="receipt">
-            <label class="field">
-              <span class="field__label">Текст чека</span>
-              <textarea class="input receipt__text" rows="5" value=${receiptText} onInput=${(e) => setReceiptText(e.target.value)}
-                placeholder="Нажмите сюда и выберите «Сканировать текст»"></textarea>
-            </label>
             <ol class="receipt__steps">
-              <li>Нажмите на поле выше → <strong>«Сканировать текст»</strong> (значок рамки с текстом над клавиатурой или в меню «Вставить»).</li>
-              <li>Наведите камеру на чек целиком, сверху вниз, и нажмите <strong>«Вставить»</strong>.</li>
-              <li>Или: сфотографируйте чек камерой, откройте фото, нажмите и удерживайте текст → «Выбрать все» → «Скопировать», вставьте сюда.</li>
+              <li>Откройте приложение <strong>«Камера»</strong> и наведите его на чек. Когда в углу кадра появится значок текста (рамка со строками), нажмите его.</li>
+              <li>Нажмите <strong>«Выбрать все»</strong> → <strong>«Скопировать»</strong>. Длинный чек удобнее сфотографировать и сделать то же самое в фото.</li>
+              <li>Вернитесь сюда и нажмите <strong>«Вставить текст чека»</strong>, затем «Вставить» во всплывшей подсказке.</li>
             </ol>
+            <button type="button" class="btn btn--primary btn--block" onClick=${pasteReceipt}>Вставить текст чека</button>
+            <label class="field">
+              <span class="field__label">Или вставьте вручную</span>
+              <textarea class="input receipt__text" rows="4" value=${receiptText} onInput=${(e) => setReceiptText(e.target.value)}
+                placeholder="Нажмите и удерживайте здесь → «Вставить»"></textarea>
+            </label>
+            <p class="field__hint">Нет значка текста в Камере? Включите: Настройки → Основные → Язык и регион → «Живой текст», и Настройки → Камера → «Показывать найденный текст».</p>
             <div class="tx-actions">
               <button type="button" class="btn btn--ghost" onClick=${() => setReceiptOpen(false)}>Отмена</button>
-              <button type="button" class="btn btn--primary btn--grow" disabled=${!receiptText.trim()} onClick=${readReceipt}>Разобрать чек</button>
+              <button type="button" class="btn btn--ghost btn--grow" disabled=${!receiptText.trim()} onClick=${() => readReceipt()}>Разобрать чек</button>
             </div>
           </div>`
-        : html`<button type="button" class="btn btn--ghost btn--block" onClick=${() => { setReceiptOpen(true); setReceiptNotes(null); }}>${Icon.receipt} Из чека камерой</button>`)}
+        : html`<button type="button" class="btn btn--ghost btn--block" onClick=${() => { setReceiptOpen(true); setReceiptNotes(null); }}>${Icon.receipt} Из чека</button>`)}
       ${receiptNotes?.length > 0 &&
       html`<div class="notice notice--warn" role="alert">
         <div>${receiptNotes.map((n) => html`<p>${n}</p>`)}</div>
