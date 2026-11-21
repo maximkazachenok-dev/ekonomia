@@ -2,12 +2,30 @@
 // Покупка — обычная трата в главном конверте с дневным лимитом, плюс shopId и items.
 import { html, useState, useEffect, useMemo } from '../lib/preact.js';
 import { BottomSheet, useApp, Money, Icon } from './common.js';
-import { parseAmount, toInputString, currencySymbol } from '../lib/money.js';
+import { parseAmount, toInputString, currencySymbol, formatMoney } from '../lib/money.js';
 import { addDays } from '../lib/dates.js';
 import { mainDailyEnvelope, shopName, itemSuggestions, lastPrice, priceChange } from '../lib/budget.js';
 import { parseReceipt } from '../lib/receipt-parse.js';
 
 const emptyRow = () => ({ name: '', price: '' });
+
+const pluralItems = (n) => {
+  const a = n % 100;
+  const b = n % 10;
+  if (a > 10 && a < 20) return 'товаров';
+  if (b === 1) return 'товар';
+  if (b >= 2 && b <= 4) return 'товара';
+  return 'товаров';
+};
+
+// Итог разбора чека: что получилось (зелёным) и что проверить (жёлтым)
+function ReceiptNotes({ notes }) {
+  return html`${notes.ok && html`<p class="receipt__ok" role="status">${notes.ok}</p>`}
+    ${notes.warnings.length > 0 &&
+    html`<div class="notice notice--warn" role="alert">
+      <div>${notes.warnings.map((n) => html`<p>${n}</p>`)}</div>
+    </div>`}`;
+}
 
 // opts: { tx } — правка; { shopId, draft? } — новая покупка (draft приходит из голосового ввода)
 export function PurchaseSheet({ opts, onClose }) {
@@ -85,14 +103,34 @@ export function PurchaseSheet({ opts, onClose }) {
       ${up ? `↑ подорожало на ${change}%` : `↓ подешевело на ${-change}%`} · было <${Money} kop=${prev} forceKop=${prev % 100 !== 0} />
     </span>`;
   };
+  // Разбор чека: строки покупки + сообщение, что получилось (видно сразу под блоком чека)
   const readReceipt = (text = receiptText) => {
     const r = parseReceipt(text);
     if (r.items.length) {
       setOnlyTotal(false);
       setRows(r.items.map((it) => ({ name: it.name, price: toInputString(it.amount) })));
       setReceiptOpen(false);
+      const sum = r.items.reduce((s, it) => s + it.amount, 0);
+      setReceiptNotes({ ok: `Из чека: ${r.items.length} ${pluralItems(r.items.length)} на ${formatMoney(sum, family.currency, { forceKop: true })} — проверьте строки и нажмите «Записать».`, warnings: r.warnings });
+      setTimeout(() => document.querySelector('.sheet .item-rows')?.scrollIntoView({ block: 'center', behavior: 'smooth' }), 50);
+    } else {
+      setReceiptNotes({ ok: null, warnings: r.warnings });
     }
-    setReceiptNotes(r.warnings);
+  };
+  // Вставили текст в поле — разбираем сразу, без лишней кнопки
+  const onReceiptPaste = (e) => {
+    const text = e.clipboardData?.getData('text');
+    if (!text?.trim()) return;
+    e.preventDefault();
+    setReceiptText(text);
+    readReceipt(text);
+  };
+  const onReceiptInput = (e) => {
+    const v = e.target.value;
+    // Текст появился целиком (вставка без события paste) — тоже разбираем сразу
+    const bulk = v.length - receiptText.length > 15;
+    setReceiptText(v);
+    if (bulk) readReceipt(v);
   };
   // Текст чека, скопированный в Камере iPhone («Живой текст» → «Скопировать»): берём из буфера обмена.
   // iPhone покажет над кнопкой «Вставить» — его нужно нажать. Не вышло — вставляют в поле вручную.
@@ -103,7 +141,7 @@ export function PurchaseSheet({ opts, onClose }) {
       setReceiptText(text);
       readReceipt(text);
     } catch {
-      setReceiptNotes(['Не удалось взять текст из буфера. Скопируйте текст чека в Камере, затем нажмите и удерживайте поле ниже → «Вставить».']);
+      setReceiptNotes({ ok: null, warnings: ['Не удалось взять текст из буфера. Скопируйте текст чека в Камере, затем нажмите и удерживайте поле ниже → «Вставить».'] });
     }
   };
   const removeRow = (i) => setRows(rows.length > 1 ? rows.filter((_, j) => j !== i) : [emptyRow()]);
@@ -163,20 +201,18 @@ export function PurchaseSheet({ opts, onClose }) {
             <button type="button" class="btn btn--primary btn--block" onClick=${pasteReceipt}>Вставить текст чека</button>
             <label class="field">
               <span class="field__label">Или вставьте вручную</span>
-              <textarea class="input receipt__text" rows="4" value=${receiptText} onInput=${(e) => setReceiptText(e.target.value)}
+              <textarea class="input receipt__text" rows="4" value=${receiptText} onInput=${onReceiptInput} onPaste=${onReceiptPaste}
                 placeholder="Нажмите и удерживайте здесь → «Вставить»"></textarea>
             </label>
+            ${receiptNotes?.warnings.length > 0 && html`<${ReceiptNotes} notes=${receiptNotes} />`}
             <p class="field__hint">Нет значка текста в Камере? Включите: Настройки → Основные → Язык и регион → «Живой текст», и Настройки → Камера → «Показывать найденный текст».</p>
             <div class="tx-actions">
               <button type="button" class="btn btn--ghost" onClick=${() => setReceiptOpen(false)}>Отмена</button>
-              <button type="button" class="btn btn--ghost btn--grow" disabled=${!receiptText.trim()} onClick=${() => readReceipt()}>Разобрать чек</button>
+              <button type="button" class="btn btn--primary btn--grow" disabled=${!receiptText.trim()} onClick=${() => readReceipt()}>Разобрать чек</button>
             </div>
           </div>`
         : html`<button type="button" class="btn btn--ghost btn--block" onClick=${() => { setReceiptOpen(true); setReceiptNotes(null); }}>${Icon.receipt} Из чека</button>`)}
-      ${receiptNotes?.length > 0 &&
-      html`<div class="notice notice--warn" role="alert">
-        <div>${receiptNotes.map((n) => html`<p>${n}</p>`)}</div>
-      </div>`}
+      ${!receiptOpen && receiptNotes && html`<${ReceiptNotes} notes=${receiptNotes} />`}
 
       ${onlyTotal
         ? html`<label class="field">
